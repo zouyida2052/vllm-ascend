@@ -42,8 +42,8 @@ from vllm.model_executor.models.qwen2_5_vl import (
 from vllm.model_executor.models.utils import maybe_prefix
 from vllm.multimodal import MULTIMODAL_REGISTRY
 
-MIN_PAD_SIZE = 64
-MAX_PAD_SIZE = 128
+MIN_PAD_SIZE = 64  # min_size to pad weight
+MAX_PAD_SIZE = 128  # max_size to pad weight
 
 
 class AscendQwen2_5_VisionAttention(Qwen2_5_VisionAttention):
@@ -96,7 +96,7 @@ class AscendQwen2_5_VisionAttention(Qwen2_5_VisionAttention):
 
         context_layer = torch.torch.empty_like(q)
 
-        # operator requires pta version >= 2.5.1.dev20250226
+        # operator requires pta version >= 2.5.1
         torch_npu._npu_flash_attention_unpad(
             query=q,
             key=k,

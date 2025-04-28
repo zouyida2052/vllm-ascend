@@ -66,6 +66,7 @@ class AscendQwen2_5_VisionAttention(Qwen2_5_VisionAttention):
         self.embed_dim = embed_dim
         self.hidden_size_per_attention_head = dist_utils.divide(
             projection_size, num_heads)
+        self.origin_hidden_size_per_attention_head = self.hidden_size_per_attention_head
         if self.hidden_size_per_attention_head > MIN_PAD_SIZE and self.hidden_size_per_attention_head < MAX_PAD_SIZE:
             self.hidden_size_per_attention_head = MAX_PAD_SIZE
 
@@ -95,13 +96,13 @@ class AscendQwen2_5_VisionAttention(Qwen2_5_VisionAttention):
 
         context_layer = torch.torch.empty_like(q)
 
-        # operator requires pta version >= 2.5.1
+        # operator requires pta version >= 2.5.1.dev20250226
         torch_npu._npu_flash_attention_unpad(
             query=q,
             key=k,
             value=v,
             seq_len=cu_seqlens,
-            scale_value=self.hidden_size_per_attention_head**-0.5,
+            scale_value=self.origin_hidden_size_per_attention_head**-0.5,
             num_heads=self.num_attention_heads_per_partition,
             num_kv_heads=self.num_attention_heads_per_partition,
             out=context_layer)
@@ -164,6 +165,7 @@ class AscendQwen2_5_VisionTransformer(Qwen2_5_VisionTransformer):
         super().__init__(vision_config, norm_eps, quant_config, prefix)
         norm_layer = partial(RMSNorm, eps=norm_eps)
         self.interleaved = interleaved
+        self.enable_pad = False
         self.patch_embed = AscendQwen2_5_VisionPatchEmbed(
             patch_size=vision_config.patch_size,
             temporal_patch_size=vision_config.temporal_patch_size,
@@ -187,6 +189,7 @@ class AscendQwen2_5_VisionTransformer(Qwen2_5_VisionTransformer):
             self.hidden_size, self.num_heads)
 
         if self.hidden_size_per_attention_head > MIN_PAD_SIZE and self.hidden_size_per_attention_head < MAX_PAD_SIZE:
+            self.enable_pad = True
             self.origin_hidden_size_per_attention_head = self.hidden_size_per_attention_head
             self.half_origin_hidden_size_per_attention_head = self.hidden_size_per_attention_head // 2
             self.half_pad_hidden_size_per_attention_head = (
@@ -196,10 +199,11 @@ class AscendQwen2_5_VisionTransformer(Qwen2_5_VisionTransformer):
     def cal_cos_sin(self, rotary_pos_emb):
         cos = rotary_pos_emb.cos()  # [seqlen, rotary_dim / 2]
         sin = rotary_pos_emb.sin()
-        cos = torch.nn.functional.pad(
-            cos, (0, self.half_pad_hidden_size_per_attention_head))
-        sin = torch.nn.functional.pad(
-            sin, (0, self.half_pad_hidden_size_per_attention_head))
+        if self.enable_pad == True:
+            cos = torch.nn.functional.pad(
+                cos, (0, self.half_pad_hidden_size_per_attention_head))
+            sin = torch.nn.functional.pad(
+                sin, (0, self.half_pad_hidden_size_per_attention_head))
 
         if not self.interleaved:
             cos_new = torch.cat((cos, cos), dim=-1)
@@ -285,11 +289,11 @@ class AscendQwen2_5_VisionTransformer(Qwen2_5_VisionTransformer):
                 weight_loader = getattr(param, "weight_loader",
                                         default_weight_loader)
                 weight_loader(param, loaded_weight)
-                if ("attn.proj.weight" in name):
+                if ("attn.proj.weight" in name) and self.enable_pad == True:
                     param.data = self.pad_proj_weight(param.data)
-                if ("attn.qkv.weight" in name):
+                if ("attn.qkv.weight" in name) and self.enable_pad == True:
                     param.data = self.pad_qkv_weight(param.data)
-                if ("attn.qkv.bias" in name):
+                if ("attn.qkv.bias" in name) and self.enable_pad == True:
                     param.data = self.pad_qkv_bias(param.data)
             loaded_params.add(name)
         return loaded_params

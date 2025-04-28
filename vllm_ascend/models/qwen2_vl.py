@@ -62,6 +62,8 @@ class AscendQwen2VisionAttention(Qwen2VisionAttention):
             prefix,
         )
         self.cu_seqlens = None
+        self.hidden_size_per_attention_head = dist_utils.divide(
+            projection_size, num_heads)
         self.origin_hidden_size_per_attention_head = self.hidden_size_per_attention_head
         if self.hidden_size_per_attention_head > MIN_PAD_SIZE and self.hidden_size_per_attention_head < MAX_PAD_SIZE:
             self.hidden_size_per_attention_head = MAX_PAD_SIZE
@@ -173,6 +175,8 @@ class AscendQwen2VisionTransformer(Qwen2VisionTransformer):
         self.interleaved = interleaved
         self.enable_pad = False
         self.depth = vision_config.depth
+        self.hidden_size = vision_config.embed_dim
+        self.num_heads = vision_config.num_heads
         self.patch_embed = AscendQwen2VisionPatchEmbed(
             patch_size=vision_config.patch_size,
             temporal_patch_size=vision_config.temporal_patch_size,
@@ -191,8 +195,6 @@ class AscendQwen2VisionTransformer(Qwen2VisionTransformer):
             for layer_idx in range(vision_config.depth)
         ])
 
-        self.hidden_size = vision_config.embed_dim
-        self.num_heads = vision_config.num_heads
         self.hidden_size_per_attention_head = dist_utils.divide(
             self.hidden_size, self.num_heads)
 
@@ -207,7 +209,7 @@ class AscendQwen2VisionTransformer(Qwen2VisionTransformer):
     def cal_cos_sin(self, rotary_pos_emb):
         cos = rotary_pos_emb.cos()  # [seqlen, rotary_dim / 2]
         sin = rotary_pos_emb.sin()
-        if self.enable_pad == True:
+        if self.enable_pad:
             cos = torch.nn.functional.pad(
                 cos, (0, self.half_pad_hidden_size_per_attention_head))
             sin = torch.nn.functional.pad(
@@ -297,11 +299,11 @@ class AscendQwen2VisionTransformer(Qwen2VisionTransformer):
                 weight_loader = getattr(param, "weight_loader",
                                         default_weight_loader)
                 weight_loader(param, loaded_weight)
-                if ("attn.proj.weight" in name) and self.enable_pad == True:
+                if ("attn.proj.weight" in name) and self.enable_pad:
                     param.data = self.pad_proj_weight(param.data)
-                if ("attn.qkv.weight" in name) and self.enable_pad == True:
+                if ("attn.qkv.weight" in name) and self.enable_pad:
                     param.data = self.pad_qkv_weight(param.data)
-                if ("attn.qkv.bias" in name) and self.enable_pad == True:
+                if ("attn.qkv.bias" in name) and self.enable_pad:
                     param.data = self.pad_qkv_bias(param.data)
             loaded_params.add(name)
         return loaded_params

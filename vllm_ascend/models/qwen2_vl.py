@@ -19,7 +19,7 @@
 
 from collections.abc import Iterable
 from functools import partial
-from typing import Callable, Optional, Set, Type, Tuple
+from typing import Callable, Optional, Set, Tuple, Type
 
 import torch
 import torch.nn as nn

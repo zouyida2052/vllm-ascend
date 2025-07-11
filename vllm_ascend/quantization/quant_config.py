@@ -15,6 +15,10 @@
 # limitations under the License.
 # This file is a part of the vllm-ascend project.
 #
+# By using quantization case, this file is called before worker patch achieve,
+# we need to import patch_utils here first to make sure the patch is applied.
+import vllm_ascend.patch.worker.patch_common.patch_utils  # type: ignore[import]  # isort: skip  # noqa
+
 from types import MappingProxyType
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
@@ -34,11 +38,12 @@ from vllm.model_executor.parameter import PerTensorScaleParameter
 from vllm.model_executor.utils import set_weight_attrs
 
 from vllm_ascend.ops.fused_moe import AscendUnquantizedFusedMoEMethod
+from vllm_ascend.utils import ASCEND_QUATIZATION_METHOD
 
 from .quantizer import AscendQuantizer
 
 
-@register_quantization_config("ascend")
+@register_quantization_config(ASCEND_QUATIZATION_METHOD)
 class AscendQuantConfig(QuantizationConfig):
     """Config class for Ascend
     
@@ -54,7 +59,7 @@ class AscendQuantConfig(QuantizationConfig):
 
     @classmethod
     def get_name(cls) -> str:
-        return "ascend"
+        return ASCEND_QUATIZATION_METHOD
 
     @classmethod
     def get_supported_act_dtypes(cls) -> List[torch.dtype]:
@@ -77,7 +82,7 @@ class AscendQuantConfig(QuantizationConfig):
     def override_quantization_method(cls, hf_quant_cfg,
                                      user_quant) -> Optional[str]:
         if torch.npu.is_available():
-            return "ascend"
+            return ASCEND_QUATIZATION_METHOD
         return None
 
     def get_quant_method(self, layer: torch.nn.Module,
@@ -92,6 +97,9 @@ class AscendQuantConfig(QuantizationConfig):
         elif isinstance(layer, Attention) and \
             'fa_quant_type' in self.quant_description.keys() and \
             self.quant_description['fa_quant_type'] is not None:
+            return AscendKVCacheMethod(self, prefix)
+        elif isinstance(layer, Attention) and self.quant_description.get(
+                'kv_quant_type') == 'C8':
             return AscendKVCacheMethod(self, prefix)
         elif isinstance(layer, FusedMoE):
             if self.is_layer_skipped_ascend(prefix,
@@ -230,32 +238,11 @@ class AscendKVCacheMethod(BaseKVCacheMethod):
         if hasattr(self.quant_method, "process_weights_after_loading"):
             self.quant_method.process_weights_after_loading(layer)
 
-    def apply(self,
-              layer: torch.nn.Module,
-              query: torch.Tensor,
-              key: torch.Tensor,
-              value: torch.Tensor,
-              k_cache: List[torch.Tensor],
-              v_cache: List[torch.Tensor],
-              scale: torch.Tensor,
-              block_tables: torch.Tensor,
-              isPrefill: bool,
-              attn_metadata,
-              output,
-              seq_lens_tensor_cpu: Optional[int] = None) -> torch.Tensor:
-        return self.quant_method.apply(layer,
-                                       query,
-                                       key,
-                                       value,
-                                       k_cache,
-                                       v_cache,
-                                       scale,
-                                       block_tables,
-                                       isPrefill,
-                                       attn_metadata.attn_mask,
-                                       attn_metadata.slot_mapping,
-                                       output,
-                                       seq_lens_tensor_cpu=seq_lens_tensor_cpu)
+    def apply(self, layer: torch.nn.Module, query: torch.Tensor,
+              key: torch.Tensor, value: torch.Tensor, kv_cache, attn_metadata,
+              attn_type, scale, output) -> torch.Tensor:
+        return self.quant_method.apply(layer, query, key, value, kv_cache,
+                                       attn_metadata, attn_type, scale, output)
 
 
 class AscendFusedMoEMethod(FusedMoEMethodBase):
@@ -317,14 +304,17 @@ class AscendFusedMoEMethod(FusedMoEMethodBase):
         scoring_func: str = "softmax",
         e_score_correction_bias: Optional[torch.Tensor] = None,
         is_prefill: bool = True,
+        enable_force_load_balance: bool = False,
+        log2phy: torch.Tensor = None,
+        global_redundant_expert_num=0,
         **kwargs,
     ) -> torch.Tensor:
-        return self.quant_method.apply(layer, x, router_logits, top_k,
-                                       renormalize, use_grouped_topk,
-                                       global_num_experts, expert_map,
-                                       topk_group, num_expert_group,
-                                       custom_routing_function, scoring_func,
-                                       e_score_correction_bias, is_prefill)
+        return self.quant_method.apply(
+            layer, x, router_logits, top_k, renormalize, use_grouped_topk,
+            global_num_experts, expert_map, topk_group, num_expert_group,
+            custom_routing_function, scoring_func, e_score_correction_bias,
+            is_prefill, enable_force_load_balance, log2phy,
+            global_redundant_expert_num, **kwargs)
 
     def process_weights_after_loading(self, layer: torch.nn.Module) -> None:
         if hasattr(self.quant_method, "process_weights_after_loading"):

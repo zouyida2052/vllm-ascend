@@ -3529,8 +3529,14 @@ class NPUModelRunner(LoRAModelRunnerMixin):
 
             if aclgraph_mode.decode_mode() == CUDAGraphMode.FULL and \
                 aclgraph_mode.separate_routine():
+                max_num_tokens = self.scheduler_config.max_num_seqs * \
+                        self.uniform_decode_query_len
+                decode_cudagraph_batch_sizes = [
+                    x for x in self.aclgraph_batch_sizes if x <= max_num_tokens
+                    and x >= self.uniform_decode_query_len
+                ]
                 compilation_cases_decode = list(
-                    reversed(self.aclgraph_batch_sizes))
+                    reversed(decode_cudagraph_batch_sizes))
                 self._capture_aclgraphs(
                     compilation_cases=compilation_cases_decode,
                     aclgraph_runtime_mode=CUDAGraphMode.FULL,

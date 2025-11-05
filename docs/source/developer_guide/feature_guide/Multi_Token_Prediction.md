@@ -6,7 +6,7 @@ MTP boosts inference performance by parallelizing the prediction of multiple tok
 ## How to Use MTP
 To enable MTP for DeepSeek-V3 models, add the following parameter when starting the service:
 
-`--speculative_config={"method": "deepseek_mtp", "num_speculative_tokens": 1}'`
+`--speculative_config={"method": "deepseek_mtp", "num_speculative_tokens": 1}`
 
 - `num_speculative_tokens`: The number of speculative tokens which enable model to predict multiple tokens at once, if provided. It will default to the number in the draft model config if present, otherwise, it is required.
 

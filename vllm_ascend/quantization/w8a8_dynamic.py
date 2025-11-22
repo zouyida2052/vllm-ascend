@@ -143,6 +143,7 @@ class AscendW8A8DynamicFusedMoEMethod:
                 and not ascend_config.torchair_graph_config.enabled)
 
         self.dynamic_eplb = ascend_config.dynamic_eplb or ascend_config.expert_map_record_path
+        self.in_dtype = vllm_config.model_config.dtype
 
         try:
             device_group = get_mc2_group().device_group
@@ -212,12 +213,13 @@ class AscendW8A8DynamicFusedMoEMethod:
         scoring_func: str = "softmax",
         e_score_correction_bias: Optional[torch.Tensor] = None,
         is_prefill: bool = True,
-        enable_force_load_balance: bool = True,
+        enable_force_load_balance: bool = False,
         log2phy: torch.Tensor = None,
         global_redundant_expert_num: int = 0,
         shared_experts: Optional[Any] = None,
         quantized_x_for_share: Optional[Any] = None,
         dynamic_scale_for_share: Optional[Any] = None,
+        pertoken_scale: Optional[Any] = None,
         **kwargs,
     ) -> torch.Tensor:
         assert router_logits.shape[
@@ -240,13 +242,15 @@ class AscendW8A8DynamicFusedMoEMethod:
         # to avoid accumulating too much tokens on a single rank.
         # currently it is only activated when doing profile runs.
         if enable_force_load_balance:
-            topk_ids = torch.randint_like(topk_ids, 0, global_num_experts)
+            topk_ids = torch.randint_like(
+                topk_ids, 0, global_num_experts - global_redundant_expert_num)
 
-        topk_weights = topk_weights.to(x.dtype)
+        topk_weights = topk_weights.to(self.in_dtype)
 
         moe_comm_method = get_forward_context().moe_comm_method
         return moe_comm_method.fused_experts(
             hidden_states=x,
+            pertoken_scale=pertoken_scale,
             w1=layer.w13_weight,
             w1_scale=layer.w13_weight_scale_fp32,
             w2=layer.w2_weight,

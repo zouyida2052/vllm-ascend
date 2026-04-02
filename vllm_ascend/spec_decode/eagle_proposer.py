@@ -361,7 +361,7 @@ class EagleProposer(VllmEagleProposer):
             )
 
             builder = self.runner.attn_groups[0][0].get_metadata_builder()
-            # update the tensor's address for each step.
+            # update the tensor's address for each step
             for draft_step in range(self.num_speculative_tokens):
                 common_attn_metadata = self.shallow_copy_metadata(
                     common_attn_metadata)

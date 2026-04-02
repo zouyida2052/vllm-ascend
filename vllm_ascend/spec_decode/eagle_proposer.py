@@ -303,7 +303,7 @@ class EagleProposer(VllmEagleProposer):
                     runtime_mode=CUDAGraphMode.FULL)
 
     def get_model(self) -> nn.Module:
-        # get raw model out of the aclgraph wrapper.
+        # get raw model out of the aclgraph wrapper
         if isinstance(self.model, ACLGraphWrapper):
             return self.model.unwrap()
         return self.model

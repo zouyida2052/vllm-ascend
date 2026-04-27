@@ -19,6 +19,8 @@ FROM quay.io/ascend/cann:8.5.1-910b-ubuntu22.04-py3.11
 
 ARG PIP_INDEX_URL="https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple"
 ARG MOONCAKE_TAG="v0.3.9"
+ARG MEMFABRIC_TAG="v1.0.0"
+ARG MEMCACHE_TAG="v1.0.0"
 ARG SOC_VERSION="ascend910b1"
 
 # Define environments
@@ -45,6 +47,19 @@ RUN apt-get update -y && \
     rm -fr /vllm-workspace/Mooncake/build && \
     rm -rf /var/cache/apt/* && \
     rm -rf /var/lib/apt/lists/*
+RUN git clone --depth 1 --branch ${MEMFABRIC_TAG} https://gitcode.com/Ascend/memfabric_hybrid.git /vllm-workspace/memfabric_hybrid && \
+    cd /vllm-workspace/memfabric_hybrid && \
+    git submodule update --recursive --init && \
+    bash script/build_and_pack_run.sh --build_mode RELEASE --build_python ON --xpu_type NPU --build_test OFF --build_hcom OFF && \
+    bash output/memfabric_hybrid-*_linux_aarch64.run && \
+    rm -rf /vllm-workspace/memfabric_hybrid
+RUN git clone --depth 1 --branch ${MEMCACHE_TAG} https://gitcode.com/Ascend/memcache.git /vllm-workspace/memcache && \
+    cd /vllm-workspace/memcache && \
+    git submodule update --recursive --init && \
+    git submodule update --remote 3rdparty/memfabric_hybrid && \
+    bash script/build_and_pack_run.sh --build_mode RELEASE && \
+    bash output/memcache_hybrid-*_linux_aarch64.run && \
+    rm -rf /vllm-workspace/memcache
 
 RUN pip config set global.index-url ${PIP_INDEX_URL}
 
@@ -98,5 +113,7 @@ RUN python3 -m pip install modelscope 'ray>=2.47.1,<=2.48.0' 'protobuf>3.20.0' &
 
 RUN echo "export LD_PRELOAD=/usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2:$LD_PRELOAD" >> ~/.bashrc
 RUN echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib" >> ~/.bashrc
+RUN echo "source /usr/local/memfabric_hybrid/set_env.sh" >> ~/.bashrc
+RUN echo "source /usr/local/memcache_hybrid/set_env.sh" >> ~/.bashrc
 
 CMD ["/bin/bash"]

@@ -31,7 +31,7 @@ numba
 
 # Required for kvpool supports memcache backend
 memfabric_hybrid==1.0.8
-memcache_hybrid==1.0.3
+memcache_hybrid==1.0.4
 
 # Install torch_npu
 #--pre

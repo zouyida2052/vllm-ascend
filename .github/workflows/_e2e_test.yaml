@@ -79,7 +79,7 @@ jobs:
         working-directory: ./vllm-empty
         run: |
           VLLM_TARGET_DEVICE=empty pip install -e .
-          pip uninstall triton
+          pip uninstall -y triton
 
       - name: Install vllm-project/vllm-ascend
         env:
@@ -186,7 +186,7 @@ jobs:
         working-directory: ./vllm-empty
         run: |
           VLLM_TARGET_DEVICE=empty pip install -e .
-          pip uninstall triton
+          pip uninstall -y triton
 
       - name: Install vllm-project/vllm-ascend
         env:
@@ -290,7 +290,7 @@ jobs:
         working-directory: ./vllm-empty
         run: |
           VLLM_TARGET_DEVICE=empty pip install -e .
-          pip uninstall triton
+          pip uninstall -y triton
 
       - name: Install vllm-project/vllm-ascend
         env:
@@ -394,7 +394,7 @@ jobs:
         working-directory: ./vllm-empty
         run: |
           VLLM_TARGET_DEVICE=empty pip install -e .
-          pip uninstall triton
+          pip uninstall -y triton
 
       - name: Install vllm-project/vllm-ascend
         env:
@@ -517,7 +517,7 @@ jobs:
         working-directory: ./vllm-empty
         run: |
           VLLM_TARGET_DEVICE=empty pip install -e .
-          pip uninstall triton
+          pip uninstall -y triton
 
       - name: Install vllm-project/vllm-ascend
         env:
@@ -614,7 +614,7 @@ jobs:
         working-directory: ./vllm-empty
         run: |
           VLLM_TARGET_DEVICE=empty pip install -e .
-          pip uninstall triton
+          pip uninstall -y triton
 
       - name: Install vllm-project/vllm-ascend
         env:
@@ -690,7 +690,7 @@ jobs:
         working-directory: ./vllm-empty
         run: |
           VLLM_TARGET_DEVICE=empty pip install -e .
-          pip uninstall triton
+          pip uninstall -y triton
 
       - name: Install vllm-project/vllm-ascend
         env:

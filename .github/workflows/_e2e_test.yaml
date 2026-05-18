@@ -521,7 +521,7 @@ jobs:
 
       - name: Install vllm-project/vllm-ascend
         env:
-          PIP_EXTRA_INDEX_URL: https://mirrors.huaweicloud.com/ascend/repos/pypi
+          PIP_EXTRA_INDEX_URL: "https://mirrors.huaweicloud.com/ascend/repos/pypi https://triton-ascend.osinfra.cn/pypi/simple"
         run: |
           pip install uc-manager
           uv pip install -r requirements-dev.txt

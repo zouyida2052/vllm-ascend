@@ -18,7 +18,7 @@ on:
       continue_on_error:
         required: false
         type: boolean
-        default: false
+        default: true
 env:
   UV_INDEX_URL: http://cache-service.nginx-pypi-cache.svc.cluster.local/pypi/simple
   UV_EXTRA_INDEX_URL: https://mirrors.huaweicloud.com/ascend/repos/pypi
@@ -83,7 +83,7 @@ jobs:
 
       - name: Install vllm-project/vllm-ascend
         env:
-          PIP_EXTRA_INDEX_URL: https://mirrors.huaweicloud.com/ascend/repos/pypi
+          PIP_EXTRA_INDEX_URL: "https://mirrors.huaweicloud.com/ascend/repos/pypi https://triton-ascend.osinfra.cn/pypi/simple"
         run: |
           pip install uc-manager
           pip install -r requirements-dev.txt
@@ -190,7 +190,7 @@ jobs:
 
       - name: Install vllm-project/vllm-ascend
         env:
-          PIP_EXTRA_INDEX_URL: https://mirrors.huaweicloud.com/ascend/repos/pypi
+          PIP_EXTRA_INDEX_URL: "https://mirrors.huaweicloud.com/ascend/repos/pypi https://triton-ascend.osinfra.cn/pypi/simple"
         run: |
           pip install uc-manager
           pip install -r requirements-dev.txt
@@ -294,7 +294,7 @@ jobs:
 
       - name: Install vllm-project/vllm-ascend
         env:
-          PIP_EXTRA_INDEX_URL: https://mirrors.huaweicloud.com/ascend/repos/pypi
+          PIP_EXTRA_INDEX_URL: "https://mirrors.huaweicloud.com/ascend/repos/pypi https://triton-ascend.osinfra.cn/pypi/simple"
         run: |
           pip install uc-manager
           pip install -r requirements-dev.txt
@@ -398,7 +398,7 @@ jobs:
 
       - name: Install vllm-project/vllm-ascend
         env:
-          PIP_EXTRA_INDEX_URL: https://mirrors.huaweicloud.com/ascend/repos/pypi
+          PIP_EXTRA_INDEX_URL: "https://mirrors.huaweicloud.com/ascend/repos/pypi https://triton-ascend.osinfra.cn/pypi/simple"
         run: |
           pip install uc-manager
           pip install -r requirements-dev.txt
@@ -521,7 +521,7 @@ jobs:
 
       - name: Install vllm-project/vllm-ascend
         env:
-          PIP_EXTRA_INDEX_URL: https://mirrors.huaweicloud.com/ascend/repos/pypi
+          PIP_EXTRA_INDEX_URL: "https://mirrors.huaweicloud.com/ascend/repos/pypi https://triton-ascend.osinfra.cn/pypi/simple"
         run: |
           pip install uc-manager
           pip install -r requirements-dev.txt
@@ -618,7 +618,7 @@ jobs:
 
       - name: Install vllm-project/vllm-ascend
         env:
-          PIP_EXTRA_INDEX_URL: https://mirrors.huaweicloud.com/ascend/repos/pypi
+          PIP_EXTRA_INDEX_URL: "https://mirrors.huaweicloud.com/ascend/repos/pypi https://triton-ascend.osinfra.cn/pypi/simple"
         run: |
           pip install uc-manager
           pip install -r requirements-dev.txt
@@ -694,7 +694,7 @@ jobs:
 
       - name: Install vllm-project/vllm-ascend
         env:
-          PIP_EXTRA_INDEX_URL: https://mirrors.huaweicloud.com/ascend/repos/pypi
+          PIP_EXTRA_INDEX_URL: "https://mirrors.huaweicloud.com/ascend/repos/pypi https://triton-ascend.osinfra.cn/pypi/simple"
         run: |
           pip install uc-manager
           pip install -r requirements-dev.txt

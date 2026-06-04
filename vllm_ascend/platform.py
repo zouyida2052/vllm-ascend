@@ -31,14 +31,6 @@ from vllm.platforms import Platform, PlatformEnum
 # todo: please remove it when solve cuda hard code in vllm
 os.environ["VLLM_DISABLE_SHARED_EXPERTS_STREAM"] = "1"
 
-# Since vllm-project/vllm#43746, DeepSeek V4 model classes no longer
-# carry @support_torch_compile. This makes vLLM auto-enable the breakable
-# cudagraph PIECEWISE path, which is not supported on Ascend yet.
-envs_vllm.VLLM_USE_BREAKABLE_CUDAGRAPH = False
-logger.info(
-    "Breakable cudagraph is force disabled on Ascend because DeepSeek V4 PIECEWISE cudagraph is not supported yet."
-)
-
 from vllm.v1.attention.backends.registry import AttentionBackendEnum
 
 from vllm_ascend.ascend_config import init_ascend_config
@@ -60,6 +52,14 @@ from vllm_ascend.utils import (
     update_cudagraph_capture_sizes,
     is_310p,
     enable_sp,
+)
+
+# Since vllm-project/vllm#43746, DeepSeek V4 model classes no longer
+# carry @support_torch_compile. This makes vLLM auto-enable the breakable
+# cudagraph PIECEWISE path, which is not supported on Ascend yet.
+envs_vllm.VLLM_USE_BREAKABLE_CUDAGRAPH = False
+logger.info(
+    "Breakable cudagraph is force disabled on Ascend because DeepSeek V4 PIECEWISE cudagraph is not supported yet."
 )
 
 if TYPE_CHECKING:

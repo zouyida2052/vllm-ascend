@@ -36,8 +36,7 @@ os.environ["VLLM_DISABLE_SHARED_EXPERTS_STREAM"] = "1"
 # cudagraph PIECEWISE path, which is not supported on Ascend yet.
 envs_vllm.VLLM_USE_BREAKABLE_CUDAGRAPH = False
 logger.info(
-    "Breakable cudagraph is force disabled on Ascend because "
-    "DeepSeek V4 PIECEWISE cudagraph is not supported yet."
+    "Breakable cudagraph is force disabled on Ascend because DeepSeek V4 PIECEWISE cudagraph is not supported yet."
 )
 
 from vllm.v1.attention.backends.registry import AttentionBackendEnum

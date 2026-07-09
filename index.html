@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>绑核原理：从 Linux 调度到推理稳定性</title>
+  <title>系统级绑核设计：从硬件拓扑到性能稳定性</title>
   <style>
     :root {
       color-scheme: dark;
@@ -370,170 +370,229 @@
 <body>
   <main class="deck" aria-live="polite">
     <section class="slide active">
-      <div class="kicker">CPU Binding</div>
+      <div class="kicker">System View</div>
       <div class="content">
-        <h1>绑核原理</h1>
-        <p>从 Linux 调度、CPU cache、NUMA 到中断处理，理解为什么关键线程需要更可控的运行位置。</p>
+        <h1>系统级绑核设计</h1>
+        <p>从硬件拓扑、OS 调度、runtime 线程、内存、中断到观测闭环，重新理解 CPU affinity 为什么影响推理稳定性。</p>
       </div>
       <div class="footer"><span>Use arrow keys</span><span>01</span></div>
     </section>
 
     <section class="slide">
-      <div class="kicker">Definition</div>
+      <div class="kicker">Map</div>
       <div class="content">
-        <div class="quote">绑核就是限制进程、线程或中断只能在指定 CPU 范围内运行。</div>
-        <div class="terminal">不绑核：CPU 0-383 都可能运行这个线程
-绑核后：这个线程只能运行在 CPU 96-111</div>
+        <h2>绑核不是一个点，而是一条系统链路</h2>
+        <div class="cards">
+          <div class="card"><b>硬件</b><span>CPU、NUMA、cache、内存、PCIe、设备亲和性。</span></div>
+          <div class="card"><b>OS</b><span>调度器、CPU affinity、cpuset、cgroup、中断。</span></div>
+          <div class="card"><b>Runtime</b><span>worker、通信线程、后台线程、驱动队列、polling。</span></div>
+        </div>
       </div>
-      <div class="footer"><span>核心定义</span><span>02</span></div>
+      <div class="footer"><span>从系统链路看绑核</span><span>02</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">Goal</div>
+      <div class="content">
+        <div class="quote">绑核的目标不是让 CPU 更快，而是让关键路径更稳定。</div>
+        <div class="terminal">核心收益 = 更少迁移 + 更少竞争 + 更少远端访问 + 更可控的中断处理</div>
+      </div>
+      <div class="footer"><span>性能优化的对象是 host-side 稳定性</span><span>03</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">Hardware Topology</div>
+      <div class="content two-col">
+        <div>
+          <h2>先看机器长什么样</h2>
+          <p>CPU 核、NUMA 节点、内存控制器、PCIe 设备和加速卡不是均匀连接的。距离决定访问成本。</p>
+        </div>
+        <div class="diagram numa">
+          <div class="node near"><b>NUMA 0</b><span>CPU cores<br />local memory</span></div>
+          <div class="node far"><b>NUMA 1</b><span>remote memory<br />cross-node access</span></div>
+          <div class="node near"><b>Device A</b><span>closer to NUMA 0</span></div>
+          <div class="node"><b>PCIe / HCCS</b><span>interconnect distance matters</span></div>
+        </div>
+      </div>
+      <div class="footer"><span>没有拓扑视角，就没有正确绑核</span><span>04</span></div>
     </section>
 
     <section class="slide">
       <div class="kicker">Scheduler</div>
       <div class="content two-col">
         <div>
-          <h2>Linux 调度器不是随机选择 CPU</h2>
-          <p>它是 Linux 内核的一部分，会综合负载、优先级、cache、NUMA 和 affinity 限制做决定。</p>
+          <h2>调度器负责选择线程在哪个 CPU 上跑</h2>
+          <p>CPU affinity 不替代调度器，只是收窄调度器的选择空间。</p>
         </div>
         <div class="diagram pipeline">
-          <div class="pipe-row"><div class="pipe-box">线程就绪</div><div class="arrow">→</div><div class="pipe-box">调度器选择 CPU</div></div>
+          <div class="pipe-row"><div class="pipe-box">线程就绪</div><div class="arrow">→</div><div class="pipe-box">Linux scheduler</div></div>
           <div class="pipe-row"><div class="pipe-box">负载 / 优先级</div><div class="arrow">+</div><div class="pipe-box">cache / NUMA</div></div>
-          <div class="pipe-row"><div class="pipe-box">affinity 约束</div><div class="arrow">→</div><div class="pipe-box">实际运行位置</div></div>
+          <div class="pipe-row"><div class="pipe-box">affinity / cpuset</div><div class="arrow">→</div><div class="pipe-box">实际 CPU</div></div>
         </div>
       </div>
-      <div class="footer"><span>不是绕过调度器，而是约束调度器</span><span>03</span></div>
+      <div class="footer"><span>绑核是约束，不是接管</span><span>05</span></div>
     </section>
 
     <section class="slide">
-      <div class="kicker">Affinity</div>
-      <div class="content two-col">
-        <div>
-          <h2>绑核改变的是选择范围</h2>
-          <p>调度器仍然工作，但它只能在允许的 CPU 集合里选择。</p>
-        </div>
-        <div class="diagram">
-          <div class="cpu-grid">
-            <div class="cpu">0</div><div class="cpu">1</div><div class="cpu">2</div><div class="cpu">3</div>
-            <div class="cpu">4</div><div class="cpu">5</div><div class="cpu">6</div><div class="cpu">7</div>
-            <div class="cpu">8</div><div class="cpu">9</div><div class="cpu">10</div><div class="cpu">11</div>
-            <div class="cpu">12</div><div class="cpu">13</div><div class="cpu">14</div><div class="cpu">15</div>
-            <div class="cpu worker">96</div><div class="cpu worker">97</div><div class="cpu worker">98</div><div class="cpu worker">99</div>
-            <div class="cpu worker">100</div><div class="cpu worker">101</div><div class="cpu worker">102</div><div class="cpu worker">103</div>
-            <div class="cpu">200</div><div class="cpu">201</div><div class="cpu">202</div><div class="cpu">203</div>
-            <div class="cpu">204</div><div class="cpu">205</div><div class="cpu">206</div><div class="cpu">207</div>
-          </div>
+      <div class="kicker">Thread Model</div>
+      <div class="content">
+        <h2>先分清线程角色，再决定谁该绑</h2>
+        <div class="cards">
+          <div class="card"><b>关键路径线程</b><span>请求调度、decode loop、host-to-device 提交路径。</span></div>
+          <div class="card"><b>runtime 线程</b><span>ACL、通信、release、callback、polling、driver helper。</span></div>
+          <div class="card"><b>系统噪声</b><span>日志、监控、SSH、容器 runtime、后台服务。</span></div>
         </div>
       </div>
-      <div class="footer"><span>绿色区域：允许运行的 CPU</span><span>04</span></div>
+      <div class="footer"><span>误绑后台线程是高风险点</span><span>06</span></div>
     </section>
 
     <section class="slide">
-      <div class="kicker">CPU Cache</div>
+      <div class="kicker">Memory Path</div>
       <div class="content two-col">
         <div>
-          <h2>cache 是 CPU 附近的高速缓存</h2>
-          <p>CPU 会自动缓存最近用过、或者附近可能马上用到的数据。线程迁移会降低复用概率。</p>
+          <h2>CPU 访问的是内存里的状态</h2>
+          <p>队列、对象、计数器、控制结构、buffer 元信息都会被反复访问，cache 和 NUMA 会影响它们的访问成本。</p>
         </div>
         <div class="diagram pipeline">
           <div class="pipe-row"><div class="pipe-box">CPU core</div><div class="arrow">↔</div><div class="pipe-box">L1 / L2 / L3 cache</div></div>
-          <div class="pipe-row"><div class="pipe-box">命中 cache</div><div class="arrow">→</div><div class="pipe-box">很快</div></div>
-          <div class="pipe-row"><div class="pipe-box">cache miss</div><div class="arrow">→</div><div class="pipe-box">重新访问内存</div></div>
+          <div class="pipe-row"><div class="pipe-box">local NUMA memory</div><div class="arrow">↔</div><div class="pipe-box">remote NUMA memory</div></div>
+          <div class="pipe-row"><div class="pipe-box">page placement</div><div class="arrow">→</div><div class="pipe-box">latency stability</div></div>
         </div>
       </div>
-      <div class="footer"><span>绑核提升 cache 复用概率</span><span>05</span></div>
+      <div class="footer"><span>绑核和内存位置是配套问题</span><span>07</span></div>
     </section>
 
     <section class="slide">
-      <div class="kicker">Data</div>
+      <div class="kicker">Device Path</div>
+      <div class="content two-col">
+        <div>
+          <h2>加速卡不是孤岛</h2>
+          <p>host 线程负责提交任务、维护队列、处理完成事件。设备通过中断或 polling 把事件带回 CPU。</p>
+        </div>
+        <div class="diagram pipeline">
+          <div class="pipe-row"><div class="pipe-box">worker thread</div><div class="arrow">→</div><div class="pipe-box">submit queue</div></div>
+          <div class="pipe-row"><div class="pipe-box">device execution</div><div class="arrow">→</div><div class="pipe-box">completion event</div></div>
+          <div class="pipe-row"><div class="pipe-box">IRQ / polling</div><div class="arrow">→</div><div class="pipe-box">host handles result</div></div>
+        </div>
+      </div>
+      <div class="footer"><span>设备事件也会回到 CPU</span><span>08</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">Isolation</div>
       <div class="content">
-        <h2>什么数据会被缓存？</h2>
+        <h2>降低抢占的关键是减少竞争者</h2>
+        <p>绑核不会提升线程优先级。它通过隔离 CPU 区域，减少关键线程和普通线程在同一个 CPU 上竞争时间片。</p>
+        <div class="terminal">不隔离：worker / logging / monitor / runtime 混在同一批 CPU
+隔离后：关键线程、后台线程、中断处理各有更清晰的位置</div>
+      </div>
+      <div class="footer"><span>CPU isolation 是稳定性的基础</span><span>09</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">Policy Design</div>
+      <div class="content">
+        <h2>设计绑核策略的五步</h2>
         <div class="cards">
-          <div class="card"><b>程序数据</b><span>变量、数组、对象字段、函数调用栈。</span></div>
-          <div class="card"><b>服务状态</b><span>请求队列、scheduler 状态、token 计数器。</span></div>
-          <div class="card"><b>runtime 数据</b><span>任务描述、控制结构、通信 buffer 元信息。</span></div>
+          <div class="card"><b>采集</b><span>allowed CPUs、NUMA、topology、visible devices、threads。</span></div>
+          <div class="card"><b>建池</b><span>给每个 worker/device 计算不重叠的 CPU pool。</span></div>
+          <div class="card"><b>分角色</b><span>worker、runtime、IRQ、polling、memory placement。</span></div>
         </div>
       </div>
-      <div class="footer"><span>cache 由硬件自动管理</span><span>06</span></div>
+      <div class="footer"><span>采集 → 建池 → 分角色 → 执行 → 验证</span><span>10</span></div>
     </section>
 
     <section class="slide">
-      <div class="kicker">NUMA</div>
+      <div class="kicker">Strategies</div>
       <div class="content two-col">
         <div>
-          <h2>NUMA 让 CPU、内存、设备有远近关系</h2>
-          <p>线程跑在远端 NUMA，会增加内存访问和设备交互的延迟。</p>
+          <h2>常见策略不是一种</h2>
+          <p>有的设备适合按拓扑亲和分配，有的适合全局切片，有的需要按 CPU cluster 分配。</p>
         </div>
-        <div class="diagram numa">
-          <div class="node near"><b>NUMA 0</b><span>CPU 和本地内存更近<br />适合亲和设备</span></div>
-          <div class="node far"><b>NUMA 1</b><span>远端访问需要跨节点<br />延迟更高</span></div>
-          <div class="node"><b>Device</b><span>NPU / NIC / PCIe 设备</span></div>
-          <div class="node"><b>Memory</b><span>数据页所在位置影响访问成本</span></div>
+        <div class="diagram pipeline">
+          <div class="pipe-row"><div class="pipe-box">topo affinity</div><div class="arrow">→</div><div class="pipe-box">靠近设备</div></div>
+          <div class="pipe-row"><div class="pipe-box">global slice</div><div class="arrow">→</div><div class="pipe-box">全局防重叠</div></div>
+          <div class="pipe-row"><div class="pipe-box">cluster binding</div><div class="arrow">→</div><div class="pipe-box">匹配硬件分组</div></div>
         </div>
       </div>
-      <div class="footer"><span>绑核常常要配合 NUMA 拓扑</span><span>07</span></div>
+      <div class="footer"><span>策略必须服从硬件形态</span><span>11</span></div>
     </section>
 
     <section class="slide">
-      <div class="kicker">Interrupt</div>
-      <div class="content two-col">
-        <div>
-          <h2>中断是设备通知 CPU：我这里有事</h2>
-          <p>网络包到达、磁盘 IO 完成、设备任务完成，都可能触发中断。中断处理也会消耗 CPU。</p>
-        </div>
-        <div class="diagram interrupt">
-          <div class="pipe-box">Device</div>
-          <div class="arrow">→</div>
-          <div class="pipe-box">CPU handles IRQ</div>
-        </div>
-      </div>
-      <div class="footer"><span>IRQ binding 让中断处理更可控</span><span>08</span></div>
-    </section>
-
-    <section class="slide">
-      <div class="kicker">Preemption</div>
+      <div class="kicker">Containers</div>
       <div class="content">
-        <h2>绑核为什么能降低抢占概率？</h2>
-        <p>它不会提高线程优先级，而是把关键线程和普通线程放到不同 CPU 区域，减少同一 CPU 上的竞争者。</p>
-        <div class="terminal">不隔离：关键线程、日志线程、后台线程都可能挤到 CPU 10
-隔离后：关键线程只在 CPU 0-15，后台线程尽量去别处</div>
-      </div>
-      <div class="footer"><span>减少竞争者，而不是制造特权</span><span>09</span></div>
-    </section>
-
-    <section class="slide">
-      <div class="kicker">Trade-off</div>
-      <div class="content">
-        <h2>绑核不是越多越好</h2>
+        <h2>容器里的绑核要尊重外部边界</h2>
         <ul>
-          <li>CPU 分得太少，关键线程会互相挤。</li>
-          <li>绑到远端 NUMA，可能比不绑更差。</li>
-          <li>误绑后台线程，可能破坏 runtime 自己的调度。</li>
-          <li>忽略 cpuset/cgroup，会导致计划和真实环境不一致。</li>
+          <li>`Cpus_allowed_list` 是当前进程能使用的真实 CPU 边界。</li>
+          <li>cgroup/cpuset 会限制进程，即使机器物理上有更多 CPU。</li>
+          <li>host 线程不一定在容器 PID namespace 里可见。</li>
+          <li>父进程 affinity 可能被子进程继承。</li>
         </ul>
       </div>
-      <div class="footer"><span>关键不是绑，而是绑到哪里</span><span>10</span></div>
+      <div class="footer"><span>先确认边界，再谈策略</span><span>12</span></div>
     </section>
 
     <section class="slide">
-      <div class="kicker">Mental Model</div>
+      <div class="kicker">Risk</div>
       <div class="content">
-        <h2>专家级心智模型</h2>
+        <h2>绑核的失败模式</h2>
         <div class="cards">
-          <div class="card"><b>隔离</b><span>关键线程有稳定 CPU 区域。</span></div>
-          <div class="card"><b>亲和</b><span>线程靠近内存和设备。</span></div>
-          <div class="card"><b>可控</b><span>减少迁移、抢占和中断干扰。</span></div>
+          <div class="card"><b>过度限制</b><span>CPU 太少，关键线程反而互相抢。</span></div>
+          <div class="card"><b>拓扑错误</b><span>绑到远端 NUMA，增加访问延迟。</span></div>
+          <div class="card"><b>误伤线程</b><span>后台线程继承或被误绑，破坏 runtime 行为。</span></div>
         </div>
       </div>
-      <div class="footer"><span>CPU isolation + topology optimization</span><span>11</span></div>
+      <div class="footer"><span>错误绑核比不绑更危险</span><span>13</span></div>
     </section>
 
     <section class="slide">
-      <div class="kicker">Summary</div>
+      <div class="kicker">Observability</div>
       <div class="content">
-        <div class="quote">绑核不是让线程神奇地变快，而是让关键线程跑得更稳定、更可控。</div>
-        <p><span class="badge">一句话</span> 限制运行范围，换取更少迁移、更高 cache 复用、更低 NUMA 干扰和更少抢占。</p>
+        <h2>专家先看证据</h2>
+        <div class="terminal">taskset -pc &lt;pid&gt;
+cat /proc/&lt;pid&gt;/status | grep Cpus_allowed_list
+for t in /proc/&lt;pid&gt;/task/*; do grep Cpus_allowed_list $t/status; done
+lscpu -e=CPU,NODE
+cat /proc/interrupts
+numactl -H</div>
       </div>
-      <div class="footer"><span>CPU Binding</span><span>12</span></div>
+      <div class="footer"><span>没有观测，就没有调优</span><span>14</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">Benchmark</div>
+      <div class="content">
+        <h2>压测绑核收益，要构造 host-bound 场景</h2>
+        <ul>
+          <li>固定模型、batch、输入输出长度、并发和请求率。</li>
+          <li>区分冷启动、warmup、正式测量。</li>
+          <li>记录 CPU affinity、NUMA、IRQ、runtime 线程状态。</li>
+          <li>对比开启/关闭时要恢复持久状态。</li>
+        </ul>
+      </div>
+      <div class="footer"><span>测的是系统，不只是一个开关</span><span>15</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">Checklist</div>
+      <div class="content">
+        <h2>设计一套绑核方案前必须回答</h2>
+        <div class="cards">
+          <div class="card"><b>拓扑</b><span>CPU、NUMA、设备亲和关系是什么？</span></div>
+          <div class="card"><b>线程</b><span>哪些线程关键，哪些线程不能误绑？</span></div>
+          <div class="card"><b>边界</b><span>cpuset、容器、权限、中断和服务状态如何？</span></div>
+        </div>
+      </div>
+      <div class="footer"><span>专家清单</span><span>16</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">Conclusion</div>
+      <div class="content">
+        <div class="quote">系统级绑核 = 拓扑理解 + CPU 隔离 + 角色分配 + 副作用控制 + 可观测验证。</div>
+        <p><span class="badge">最终判断</span> 绑核不是固定线程这么简单，而是在复杂系统里为关键路径设计稳定的运行边界。</p>
+      </div>
+      <div class="footer"><span>CPU Binding System Design</span><span>17</span></div>
     </section>
   </main>
 

@@ -68,24 +68,26 @@
       margin: 0;
       line-height: 1.08;
       letter-spacing: 0;
+      overflow-wrap: anywhere;
     }
 
     h1 {
       max-width: 980px;
-      font-size: clamp(44px, 7vw, 98px);
+      font-size: clamp(42px, 6.4vw, 88px);
     }
 
     h2 {
       max-width: 1080px;
-      font-size: clamp(34px, 5vw, 72px);
+      font-size: clamp(30px, 4.2vw, 58px);
     }
 
     p {
       max-width: 980px;
       margin: 0;
       color: var(--muted);
-      font-size: clamp(18px, 2vw, 30px);
+      font-size: clamp(17px, 1.55vw, 24px);
       line-height: 1.55;
+      overflow-wrap: anywhere;
     }
 
     strong {
@@ -95,12 +97,12 @@
     .content {
       display: grid;
       align-content: center;
-      gap: 30px;
+      gap: 22px;
     }
 
     .two-col {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(320px, 0.85fr);
+      grid-template-columns: minmax(0, 1fr) minmax(340px, 0.95fr);
       gap: clamp(28px, 4vw, 60px);
       align-items: center;
     }
@@ -112,8 +114,8 @@
     }
 
     .card {
-      min-height: 140px;
-      padding: 22px;
+      min-height: 132px;
+      padding: 20px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: rgba(23, 28, 34, 0.84);
@@ -123,13 +125,14 @@
       display: block;
       margin-bottom: 10px;
       color: var(--text);
-      font-size: clamp(18px, 1.7vw, 25px);
+      font-size: clamp(17px, 1.45vw, 22px);
     }
 
     .card span {
       color: var(--muted);
-      font-size: clamp(15px, 1.3vw, 19px);
+      font-size: clamp(14px, 1.05vw, 17px);
       line-height: 1.5;
+      overflow-wrap: anywhere;
     }
 
     .quote {
@@ -137,7 +140,7 @@
       padding-left: 26px;
       border-left: 5px solid var(--blue);
       color: var(--text);
-      font-size: clamp(30px, 4vw, 62px);
+      font-size: clamp(26px, 3.4vw, 50px);
       line-height: 1.22;
       font-weight: 800;
     }
@@ -149,8 +152,8 @@
       background: #0a0d10;
       color: #c9f7d9;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: clamp(15px, 1.55vw, 24px);
-      line-height: 1.7;
+      font-size: clamp(13px, 1.15vw, 18px);
+      line-height: 1.62;
       white-space: pre-wrap;
     }
 
@@ -199,7 +202,7 @@
     }
 
     .diagram {
-      min-height: 330px;
+      min-height: 320px;
       padding: 24px;
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -253,8 +256,9 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       background: var(--panel-2);
-      font-size: clamp(16px, 1.5vw, 22px);
+      font-size: clamp(15px, 1.25vw, 19px);
       color: var(--text);
+      overflow-wrap: anywhere;
     }
 
     .arrow {
@@ -321,11 +325,11 @@
 
     ul {
       display: grid;
-      gap: 14px;
+      gap: 10px;
       margin: 0;
       padding-left: 26px;
       color: var(--muted);
-      font-size: clamp(18px, 2vw, 29px);
+      font-size: clamp(16px, 1.45vw, 22px);
       line-height: 1.5;
     }
 
@@ -333,9 +337,89 @@
       color: var(--green);
     }
 
+    .dense {
+      align-content: center;
+      gap: 18px;
+    }
+
+    .lead {
+      max-width: 1160px;
+      color: var(--text);
+      font-size: clamp(19px, 1.8vw, 28px);
+      line-height: 1.42;
+    }
+
+    .notes {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .note {
+      padding: 16px 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(32, 39, 50, 0.72);
+      color: var(--muted);
+      font-size: clamp(14px, 1.08vw, 18px);
+      line-height: 1.5;
+    }
+
+    .note b {
+      color: var(--text);
+    }
+
+    .takeaway {
+      padding: 16px 18px;
+      border-left: 4px solid var(--green);
+      background: rgba(85, 209, 139, 0.08);
+      color: var(--text);
+      font-size: clamp(15px, 1.2vw, 19px);
+      line-height: 1.55;
+    }
+
+    .matrix {
+      display: grid;
+      grid-template-columns: 0.8fr 1fr 1fr;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: rgba(23, 28, 34, 0.72);
+    }
+
+    .matrix div {
+      padding: 13px 15px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: clamp(13px, 1vw, 16px);
+      line-height: 1.42;
+    }
+
+    .matrix div:nth-child(3n) {
+      border-right: 0;
+    }
+
+    .matrix div:nth-last-child(-n + 3) {
+      border-bottom: 0;
+    }
+
+    .matrix .head {
+      color: var(--text);
+      font-weight: 800;
+      background: rgba(95, 179, 255, 0.12);
+    }
+
+    .mini {
+      color: var(--muted);
+      font-size: clamp(13px, 1.05vw, 16px);
+      line-height: 1.5;
+    }
+
     @media (max-width: 860px) {
       body {
         overflow-y: auto;
+        overflow-x: hidden;
       }
 
       .deck {
@@ -346,14 +430,52 @@
       .slide {
         position: relative;
         min-height: 100vh;
+        padding: 28px;
+        overflow-x: hidden;
+      }
+
+      h1,
+      h2,
+      p,
+      li,
+      .card,
+      .card span,
+      .note,
+      .takeaway,
+      .terminal,
+      .pipe-box,
+      .matrix div {
+        max-width: calc(100vw - 56px);
+        word-break: break-word;
+        overflow-wrap: anywhere;
+      }
+
+      h1 {
+        font-size: clamp(36px, 12vw, 52px);
+      }
+
+      h2 {
+        font-size: clamp(28px, 8.6vw, 38px);
       }
 
       .two-col,
       .cards,
+      .notes,
       .numa,
       .interrupt,
       .pipe-row {
         grid-template-columns: 1fr;
+      }
+
+      .matrix {
+        grid-template-columns: 1fr;
+      }
+
+      .matrix div,
+      .matrix div:nth-child(3n),
+      .matrix div:nth-last-child(-n + 3) {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
       }
 
       .arrow {
@@ -365,37 +487,69 @@
         display: none;
       }
     }
+
+    @media (max-width: 520px) {
+      h1,
+      h2,
+      p,
+      ul,
+      li,
+      .cards,
+      .card,
+      .notes,
+      .note,
+      .takeaway,
+      .terminal,
+      .diagram,
+      .matrix,
+      .matrix div {
+        max-width: 330px;
+      }
+    }
   </style>
 </head>
 <body>
   <main class="deck" aria-live="polite">
     <section class="slide active">
       <div class="kicker">System View</div>
-      <div class="content">
+      <div class="content dense">
         <h1>系统级绑核设计</h1>
-        <p>从硬件拓扑、OS 调度、runtime 线程、内存、中断到观测闭环，重新理解 CPU affinity 为什么影响推理稳定性。</p>
+        <p class="lead">绑核不是把一个 PID 固定到几个 CPU 这么简单。它是在硬件拓扑、Linux 调度器、runtime 线程模型、NUMA 内存路径和设备事件路径之间，为推理关键链路设计一个更稳定的运行边界。</p>
+        <div class="notes">
+          <div class="note"><b>学习目标：</b>能解释为什么绑核有效、什么时候收益最大、什么时候反而危险。</div>
+          <div class="note"><b>工程目标：</b>让 worker、runtime 线程、IRQ/polling 和系统噪声各在合理位置，减少 host-side 抖动。</div>
+        </div>
+        <div class="takeaway">Key takeaway：绑核优化的是确定性，不是 CPU 峰值算力。</div>
       </div>
       <div class="footer"><span>Use arrow keys</span><span>01</span></div>
     </section>
 
     <section class="slide">
       <div class="kicker">Map</div>
-      <div class="content">
-        <h2>绑核不是一个点，而是一条系统链路</h2>
+      <div class="content dense">
+        <h2>绑核是一条跨层链路</h2>
+        <p>一次推理请求会在用户态调度、runtime API、驱动队列、设备执行、完成事件和内存访问之间反复穿梭。只看某个线程的 affinity，很容易忽略真实瓶颈来自系统链路中的哪一段。</p>
         <div class="cards">
-          <div class="card"><b>硬件</b><span>CPU、NUMA、cache、内存、PCIe、设备亲和性。</span></div>
-          <div class="card"><b>OS</b><span>调度器、CPU affinity、cpuset、cgroup、中断。</span></div>
-          <div class="card"><b>Runtime</b><span>worker、通信线程、后台线程、驱动队列、polling。</span></div>
+          <div class="card"><b>硬件层</b><span>CPU core、SMT、NUMA node、cache、内存控制器、PCIe/HCCS 距离决定访问成本。</span></div>
+          <div class="card"><b>OS 层</b><span>Linux scheduler 根据就绪队列、负载、优先级、affinity 和 cgroup 边界选择实际 CPU。</span></div>
+          <div class="card"><b>Runtime 层</b><span>worker、ACL、通信、release、callback、polling、driver helper 不一定有相同的绑核诉求。</span></div>
         </div>
+        <div class="takeaway">判断绑核方案是否合理，要从“线程在哪跑、访问哪块内存、服务哪个设备、是否会互相抢占”四个问题同时看。</div>
       </div>
       <div class="footer"><span>从系统链路看绑核</span><span>02</span></div>
     </section>
 
     <section class="slide">
       <div class="kicker">Goal</div>
-      <div class="content">
+      <div class="content dense">
         <div class="quote">绑核的目标不是让 CPU 更快，而是让关键路径更稳定。</div>
-        <div class="terminal">核心收益 = 更少迁移 + 更少竞争 + 更少远端访问 + 更可控的中断处理</div>
+        <p>如果瓶颈在 device compute，绑核可能收益很小；如果瓶颈在 host 调度、队列提交、事件处理、内存访问和线程抢占，绑核就可能明显提升吞吐稳定性和尾延迟表现。</p>
+        <div class="terminal">收益来源：
+1. 减少线程迁移，降低 cache 热数据失效概率
+2. 减少关键线程与后台线程争抢同一个 CPU
+3. 让 worker 靠近亲和 NUMA，减少远端内存访问
+4. 让 IRQ / polling / runtime helper 位置更可控</div>
+        <div class="takeaway">Key takeaway：绑核收益最大的场景通常是 host-bound，而不是纯 compute-bound。</div>
       </div>
       <div class="footer"><span>性能优化的对象是 host-side 稳定性</span><span>03</span></div>
     </section>
@@ -403,9 +557,14 @@
     <section class="slide">
       <div class="kicker">Hardware Topology</div>
       <div class="content two-col">
-        <div>
+        <div class="dense">
           <h2>先看机器长什么样</h2>
-          <p>CPU 核、NUMA 节点、内存控制器、PCIe 设备和加速卡不是均匀连接的。距离决定访问成本。</p>
+          <p>CPU 核、NUMA 节点、内存控制器、PCIe 设备和加速卡不是均匀连接的。一个 CPU 访问本地 NUMA 内存和远端 NUMA 内存，成本可能完全不同；一个设备也常常更靠近某些 NUMA。</p>
+          <div class="notes">
+            <div class="note"><b>NUMA locality：</b>worker 绑在亲和 NUMA，通常更容易减少跨 NUMA 访问。</div>
+            <div class="note"><b>设备距离：</b>IRQ、polling、提交队列处理线程也应该考虑设备所在拓扑。</div>
+          </div>
+          <div class="takeaway">策略第一步不是切 CPU，而是确认 CPU/NPU/NUMA 的关系。</div>
         </div>
         <div class="diagram numa">
           <div class="node near"><b>NUMA 0</b><span>CPU cores<br />local memory</span></div>
@@ -420,9 +579,14 @@
     <section class="slide">
       <div class="kicker">Scheduler</div>
       <div class="content two-col">
-        <div>
-          <h2>调度器负责选择线程在哪个 CPU 上跑</h2>
-          <p>CPU affinity 不替代调度器，只是收窄调度器的选择空间。</p>
+        <div class="dense">
+          <h2>绑核是在约束 Linux 调度器</h2>
+          <p>线程不是绝对随机地跑在某个 CPU 上。Linux scheduler 会综合优先级、负载均衡、cache 亲和、NUMA 信息和 affinity mask 做选择。绑核的本质是把“可选 CPU 集合”缩小，让关键线程少漂移。</p>
+          <div class="notes">
+            <div class="note"><b>不绑：</b>调度器自由度大，吞吐平均值可能还行，但抖动更难控制。</div>
+            <div class="note"><b>绑核：</b>自由度变小，关键线程更稳定，但 CPU 选少了会造成反向拥塞。</div>
+          </div>
+          <div class="takeaway">绑核不是接管调度器，而是给调度器设置边界。</div>
         </div>
         <div class="diagram pipeline">
           <div class="pipe-row"><div class="pipe-box">线程就绪</div><div class="arrow">→</div><div class="pipe-box">Linux scheduler</div></div>
@@ -435,13 +599,17 @@
 
     <section class="slide">
       <div class="kicker">Thread Model</div>
-      <div class="content">
+      <div class="content dense">
         <h2>先分清线程角色，再决定谁该绑</h2>
-        <div class="cards">
-          <div class="card"><b>关键路径线程</b><span>请求调度、decode loop、host-to-device 提交路径。</span></div>
-          <div class="card"><b>runtime 线程</b><span>ACL、通信、release、callback、polling、driver helper。</span></div>
-          <div class="card"><b>系统噪声</b><span>日志、监控、SSH、容器 runtime、后台服务。</span></div>
+        <p>一个推理服务里通常不只有 worker 主线程。runtime helper、通信线程、release 线程、polling 线程、日志线程都可能存在。不同线程对 CPU 位置、隔离程度、数量的需求不一样。</p>
+        <div class="matrix">
+          <div class="head">线程类型</div><div class="head">常见职责</div><div class="head">绑核判断</div>
+          <div>worker 主路径</div><div>调度请求、提交 decode、维护 batch/队列状态</div><div>通常最值得隔离，优先靠近设备亲和 NUMA</div>
+          <div>runtime/helper</div><div>ACL、通信、release、callback、driver 辅助线程</div><div>有些需要绑，有些不能误绑，要看产品形态</div>
+          <div>polling / IRQ</div><div>处理设备完成事件或轮询设备状态</div><div>可能需要专属 CPU，避免被普通线程抢占</div>
+          <div>系统噪声</div><div>日志、监控、SSH、容器 runtime、后台服务</div><div>应该尽量避开关键 CPU pool</div>
         </div>
+        <div class="takeaway">误绑后台线程和漏绑关键 helper 都可能让性能表现看起来“玄学”。</div>
       </div>
       <div class="footer"><span>误绑后台线程是高风险点</span><span>06</span></div>
     </section>
@@ -449,9 +617,14 @@
     <section class="slide">
       <div class="kicker">Memory Path</div>
       <div class="content two-col">
-        <div>
-          <h2>CPU 访问的是内存里的状态</h2>
-          <p>队列、对象、计数器、控制结构、buffer 元信息都会被反复访问，cache 和 NUMA 会影响它们的访问成本。</p>
+        <div class="dense">
+          <h2>绑核会改变 cache 和内存访问稳定性</h2>
+          <p>CPU 不只是“执行代码”，它还会反复读写队列、对象、计数器、请求状态、buffer 元信息。线程迁移后，原 CPU 上的 cache 热数据不一定还能命中；跨 NUMA 访问也会增加延迟和抖动。</p>
+          <div class="notes">
+            <div class="note"><b>会被缓存的数据：</b>调度队列、batch metadata、引用计数、状态机字段、环形队列指针。</div>
+            <div class="note"><b>为什么缓存：</b>CPU 会把近期访问的数据放进 L1/L2/L3，减少每次都去内存拿。</div>
+          </div>
+          <div class="takeaway">线程位置和 page placement 要一起看，否则“绑了 CPU 但内存还在远端”。</div>
         </div>
         <div class="diagram pipeline">
           <div class="pipe-row"><div class="pipe-box">CPU core</div><div class="arrow">↔</div><div class="pipe-box">L1 / L2 / L3 cache</div></div>
@@ -465,9 +638,14 @@
     <section class="slide">
       <div class="kicker">Device Path</div>
       <div class="content two-col">
-        <div>
+        <div class="dense">
           <h2>加速卡不是孤岛</h2>
-          <p>host 线程负责提交任务、维护队列、处理完成事件。设备通过中断或 polling 把事件带回 CPU。</p>
+          <p>kernel launch、算子执行、拷贝、图执行请求通常由主路径发起，但真正的执行和完成通知会经过驱动队列、设备队列、中断或 polling。host 端如果处理完成事件不稳定，device 端再快也会被 host 拖住。</p>
+          <div class="notes">
+            <div class="note"><b>SQ：</b>submit queue，host 向设备提交任务或命令的队列。</div>
+            <div class="note"><b>CQ：</b>completion queue，设备把完成状态带回 host 侧处理。</div>
+          </div>
+          <div class="takeaway">IRQ/polling 不是“额外概念”，它们是设备事件回到 CPU 的路径。</div>
         </div>
         <div class="diagram pipeline">
           <div class="pipe-row"><div class="pipe-box">worker thread</div><div class="arrow">→</div><div class="pipe-box">submit queue</div></div>
@@ -480,66 +658,83 @@
 
     <section class="slide">
       <div class="kicker">Isolation</div>
-      <div class="content">
-        <h2>降低抢占的关键是减少竞争者</h2>
-        <p>绑核不会提升线程优先级。它通过隔离 CPU 区域，减少关键线程和普通线程在同一个 CPU 上竞争时间片。</p>
-        <div class="terminal">不隔离：worker / logging / monitor / runtime 混在同一批 CPU
-隔离后：关键线程、后台线程、中断处理各有更清晰的位置</div>
+      <div class="content dense">
+        <h2>降低抢占概率，靠的是减少竞争者</h2>
+        <p>绑核不会自动提高线程优先级。它降低关键线程被抢占概率的方式，是把普通线程、后台服务、日志、监控、runtime 噪声尽量排除出关键 CPU pool，让关键线程所在 CPU 的就绪队列更干净。</p>
+        <div class="terminal">不隔离：
+CPU set = worker + logging + monitor + runtime helper + system service
+结果 = 关键线程经常和普通线程抢同一批时间片
+
+隔离后：
+worker pool / helper pool / IRQ or polling pool / background pool
+结果 = 关键路径更少被无关线程打断</div>
+        <div class="takeaway">绑核的收益来自“更少竞争”，不是来自“更高优先级”。</div>
       </div>
       <div class="footer"><span>CPU isolation 是稳定性的基础</span><span>09</span></div>
     </section>
 
     <section class="slide">
       <div class="kicker">Policy Design</div>
-      <div class="content">
-        <h2>设计绑核策略的五步</h2>
+      <div class="content dense">
+        <h2>一套绑核策略至少要走五步</h2>
         <div class="cards">
-          <div class="card"><b>采集</b><span>allowed CPUs、NUMA、topology、visible devices、threads。</span></div>
-          <div class="card"><b>建池</b><span>给每个 worker/device 计算不重叠的 CPU pool。</span></div>
-          <div class="card"><b>分角色</b><span>worker、runtime、IRQ、polling、memory placement。</span></div>
+          <div class="card"><b>1. 采集</b><span>收集 allowed CPUs、NUMA、topology、visible devices、线程列表和 IRQ/polling 信息。</span></div>
+          <div class="card"><b>2. 建池</b><span>按设备或 worker 计算 CPU pool，必须考虑 hidden NPU，避免 DP 组重复用 CPU。</span></div>
+          <div class="card"><b>3. 分角色</b><span>区分 main、runtime helper、IRQ、polling、background 和 memory placement。</span></div>
+          <div class="card"><b>4. 执行</b><span>用 taskset、smp_affinity、migratepages 等机制实际改变运行位置。</span></div>
+          <div class="card"><b>5. 验证</b><span>反查 /proc、taskset、interrupts、NUMA 状态和压测结果，确认没有副作用。</span></div>
+          <div class="card"><b>6. 回滚</b><span>设计时必须知道哪些修改是进程级，哪些可能影响宿主机或后台线程。</span></div>
         </div>
+        <div class="takeaway">只会“分 CPU”不够，完整方案必须包含执行、观测和回滚边界。</div>
       </div>
       <div class="footer"><span>采集 → 建池 → 分角色 → 执行 → 验证</span><span>10</span></div>
     </section>
 
     <section class="slide">
       <div class="kicker">Strategies</div>
-      <div class="content two-col">
-        <div>
-          <h2>常见策略不是一种</h2>
-          <p>有的设备适合按拓扑亲和分配，有的适合全局切片，有的需要按 CPU cluster 分配。</p>
+      <div class="content dense">
+        <h2>不同硬件形态对应不同策略</h2>
+        <p>策略不能先入为主。是否使用 topo affinity、是否扩展相邻 NUMA、是否全局切片、是否按 cluster 分配，都取决于设备上报的信息和服务器结构。</p>
+        <div class="matrix">
+          <div class="head">策略</div><div class="head">适合场景</div><div class="head">主要风险</div>
+          <div>topo affinity</div><div>设备明确上报 NPU 到 CPU/NUMA 的亲和关系</div><div>topo 缺失或错误时，绑到错误 NUMA</div>
+          <div>global slice</div><div>没有可靠 topo，但全局 CPU 资源足够，需要避免 DP 组重叠</div><div>CPU 编号不等于真实拓扑时，局部性可能差</div>
+          <div>cluster binding</div><div>硬件以 cluster 为性能/调度单元，worker 应拿完整 cluster</div><div>cluster 形状判断错，会造成资源浪费或争抢</div>
+          <div>IRQ / polling binding</div><div>设备事件处理对 host 侧延迟敏感</div><div>误绑系统级后台线程，影响关闭绑核后的基线</div>
         </div>
-        <div class="diagram pipeline">
-          <div class="pipe-row"><div class="pipe-box">topo affinity</div><div class="arrow">→</div><div class="pipe-box">靠近设备</div></div>
-          <div class="pipe-row"><div class="pipe-box">global slice</div><div class="arrow">→</div><div class="pipe-box">全局防重叠</div></div>
-          <div class="pipe-row"><div class="pipe-box">cluster binding</div><div class="arrow">→</div><div class="pipe-box">匹配硬件分组</div></div>
-        </div>
+        <div class="takeaway">新产品适配时，先问“硬件真实分组是什么”，再决定算法。</div>
       </div>
       <div class="footer"><span>策略必须服从硬件形态</span><span>11</span></div>
     </section>
 
     <section class="slide">
       <div class="kicker">Containers</div>
-      <div class="content">
-        <h2>容器里的绑核要尊重外部边界</h2>
+      <div class="content dense">
+        <h2>容器里的绑核先看边界</h2>
+        <p>在容器中，进程看到的 CPU、PID、权限和宿主机不一定一致。你以为在绑整机 CPU，实际可能只能使用 cgroup 分配的一小段；你以为能看到 host 后台线程，实际 PID namespace 隔离后根本看不到。</p>
         <ul>
-          <li>`Cpus_allowed_list` 是当前进程能使用的真实 CPU 边界。</li>
-          <li>cgroup/cpuset 会限制进程，即使机器物理上有更多 CPU。</li>
-          <li>host 线程不一定在容器 PID namespace 里可见。</li>
-          <li>父进程 affinity 可能被子进程继承。</li>
+          <li><strong>Cpus_allowed_list</strong> 是当前进程真实可用 CPU 边界，不能只看物理 CPU 总数。</li>
+          <li><strong>cpuset/cgroup</strong> 会限制进程，即使 `lscpu` 显示机器有更多 CPU。</li>
+          <li><strong>PID namespace</strong> 会影响能否看到宿主机线程；绑定 host thread 常需要 `--pid=host`。</li>
+          <li><strong>继承关系</strong> 很重要：父进程 affinity 可能影响后续 worker、helper 或后台线程。</li>
         </ul>
+        <div class="takeaway">容器里调绑核，第一条命令应该是查边界，而不是直接 taskset。</div>
       </div>
       <div class="footer"><span>先确认边界，再谈策略</span><span>12</span></div>
     </section>
 
     <section class="slide">
       <div class="kicker">Risk</div>
-      <div class="content">
-        <h2>绑核的失败模式</h2>
+      <div class="content dense">
+        <h2>错误绑核比不绑更危险</h2>
+        <p>绑核是强约束。约束正确时，它减少不确定性；约束错误时，它会制造新的瓶颈，并且问题往往会伪装成“模型慢”“框架慢”或“机器不稳定”。</p>
         <div class="cards">
-          <div class="card"><b>过度限制</b><span>CPU 太少，关键线程反而互相抢。</span></div>
-          <div class="card"><b>拓扑错误</b><span>绑到远端 NUMA，增加访问延迟。</span></div>
-          <div class="card"><b>误伤线程</b><span>后台线程继承或被误绑，破坏 runtime 行为。</span></div>
+          <div class="card"><b>过度限制</b><span>CPU 太少，main/helper/IRQ 互相抢，吞吐和尾延迟都变差。</span></div>
+          <div class="card"><b>拓扑错误</b><span>worker 绑到远端 NUMA，cache 和内存访问更不稳定。</span></div>
+          <div class="card"><b>误伤线程</b><span>把系统级 polling 或后台线程绑错，关闭服务后影响仍可能持续。</span></div>
+          <div class="card"><b>隐藏重叠</b><span>只看 visible NPU 切 CPU，多个 DP 组可能重复使用同一段 CPU。</span></div>
+          <div class="card"><b>权限不足</b><span>写 IRQ affinity、迁移内存、查看 host PID 都可能受权限限制。</span></div>
+          <div class="card"><b>观测缺失</b><span>没有记录变更前后状态，就无法判断收益来自哪里。</span></div>
         </div>
       </div>
       <div class="footer"><span>错误绑核比不绑更危险</span><span>13</span></div>
@@ -547,49 +742,72 @@
 
     <section class="slide">
       <div class="kicker">Observability</div>
-      <div class="content">
-        <h2>专家先看证据</h2>
-        <div class="terminal">taskset -pc &lt;pid&gt;
-cat /proc/&lt;pid&gt;/status | grep Cpus_allowed_list
+      <div class="content dense">
+        <h2>专家先看证据，再谈策略</h2>
+        <p>绑核问题不能只看日志里的“plan”。必须反查进程、线程、NUMA、IRQ 和容器边界，确认实际状态等于设计状态。</p>
+        <div class="terminal"># 进程/线程 affinity
+taskset -pc &lt;pid&gt;
 for t in /proc/&lt;pid&gt;/task/*; do grep Cpus_allowed_list $t/status; done
+
+# 容器和 NUMA 边界
+cat /proc/&lt;pid&gt;/status | grep Cpus_allowed_list
 lscpu -e=CPU,NODE
+numactl -H
+
+# 设备事件路径
 cat /proc/interrupts
-numactl -H</div>
+ls /proc/&lt;pid&gt;/task/*/comm | xargs -I{} sh -c 'echo {}; cat {}'</div>
+        <div class="takeaway">验证顺序：先确认能用哪些 CPU，再确认线程实际在哪，最后对比性能。</div>
       </div>
       <div class="footer"><span>没有观测，就没有调优</span><span>14</span></div>
     </section>
 
     <section class="slide">
       <div class="kicker">Benchmark</div>
-      <div class="content">
-        <h2>压测绑核收益，要构造 host-bound 场景</h2>
+      <div class="content dense">
+        <h2>压测绑核收益，要主动构造 host-bound 场景</h2>
+        <p>如果请求太少，host 线程不忙，看不出收益；如果模型计算太重，瓶颈在 device compute，也看不出收益。要展示绑核价值，应让 host 调度、提交、事件处理和 runtime 线程竞争变成主要压力源。</p>
+        <div class="notes">
+          <div class="note"><b>推荐方向：</b>小输入/中等输出、较高并发、持续压测、request_rate=0 或足够高，让服务端尽量饱和。</div>
+          <div class="note"><b>必须固定：</b>模型、精度、TP/DP、输入输出长度、并发、warmup、正式测量窗口。</div>
+        </div>
         <ul>
-          <li>固定模型、batch、输入输出长度、并发和请求率。</li>
-          <li>区分冷启动、warmup、正式测量。</li>
-          <li>记录 CPU affinity、NUMA、IRQ、runtime 线程状态。</li>
-          <li>对比开启/关闭时要恢复持久状态。</li>
+          <li>记录开启/关闭绑核前后的 CPU affinity、NUMA、IRQ/polling 和关键线程状态。</li>
+          <li>每组至少多跑几次，关注 tokens/s、P99 latency 和抖动，而不是只看单次最高值。</li>
+          <li>关闭绑核后要确认没有遗留 host 线程 affinity，否则基线会被污染。</li>
         </ul>
+        <div class="takeaway">展示型 benchmark 的目标不是“证明任何场景都涨”，而是找出绑核最该发挥作用的系统压力场景。</div>
       </div>
       <div class="footer"><span>测的是系统，不只是一个开关</span><span>15</span></div>
     </section>
 
     <section class="slide">
       <div class="kicker">Checklist</div>
-      <div class="content">
-        <h2>设计一套绑核方案前必须回答</h2>
-        <div class="cards">
-          <div class="card"><b>拓扑</b><span>CPU、NUMA、设备亲和关系是什么？</span></div>
-          <div class="card"><b>线程</b><span>哪些线程关键，哪些线程不能误绑？</span></div>
-          <div class="card"><b>边界</b><span>cpuset、容器、权限、中断和服务状态如何？</span></div>
+      <div class="content dense">
+        <h2>新产品形态适配前的专家清单</h2>
+        <div class="matrix">
+          <div class="head">问题</div><div class="head">要拿到的信息</div><div class="head">影响的设计</div>
+          <div>拓扑是什么？</div><div>`npu-smi info -t topo`、`lscpu -e=CPU,NODE`、NUMA/cluster 结构</div><div>topo、global slice、cluster 选型</div>
+          <div>线程有哪些？</div><div>`ps -Te`、worker 子线程、runtime helper、polling thread</div><div>main/helper/polling 是否分池</div>
+          <div>事件怎么回来？</div><div>IRQ 名称、MSI-X、polling 线程、是否允许写 smp_affinity</div><div>是否绑 IRQ，是否预留 CPU</div>
+          <div>边界在哪里？</div><div>Cpus_allowed_list、cgroup、Docker PID namespace、权限</div><div>能否绑定 host thread，是否需要 `--pid=host`</div>
+          <div>失败怎么退？</div><div>哪些设置是进程级、哪些是宿主机级、哪些会被继承</div><div>回滚策略和 troubleshooting</div>
         </div>
+        <div class="takeaway">适配新硬件时，不要先写算法；先收集足够信息，让策略自然长出来。</div>
       </div>
       <div class="footer"><span>专家清单</span><span>16</span></div>
     </section>
 
     <section class="slide">
       <div class="kicker">Conclusion</div>
-      <div class="content">
+      <div class="content dense">
         <div class="quote">系统级绑核 = 拓扑理解 + CPU 隔离 + 角色分配 + 副作用控制 + 可观测验证。</div>
+        <div class="notes">
+          <div class="note"><b>一句话背诵：</b>绑核是用 affinity/cpuset 等机制，把关键线程限制在更合理、更少竞争、更靠近设备和内存的位置。</div>
+          <div class="note"><b>判断收益：</b>host-bound 越明显，关键线程越容易被抢占，设备事件越依赖 host，绑核越可能有价值。</div>
+          <div class="note"><b>判断风险：</b>如果拓扑不清、线程角色不清、容器边界不清，绑核可能比不绑更危险。</div>
+          <div class="note"><b>最终闭环：</b>设计方案必须能被命令观测证明，也必须能安全回滚。</div>
+        </div>
         <p><span class="badge">最终判断</span> 绑核不是固定线程这么简单，而是在复杂系统里为关键路径设计稳定的运行边界。</p>
       </div>
       <div class="footer"><span>CPU Binding System Design</span><span>17</span></div>

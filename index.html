@@ -514,7 +514,7 @@
       <div class="kicker">System View</div>
       <div class="content dense">
         <h1>系统级绑核设计</h1>
-        <p class="lead">绑核不是把一个 PID 固定到几个 CPU 这么简单。它是在硬件拓扑、Linux 调度器、runtime 线程模型、NUMA 内存路径和设备事件路径之间，为推理关键链路设计一个更稳定的运行边界。</p>
+        <p class="lead">绑核不是把一个 PID 固定到几个 CPU 这么简单。这里先讲系统级原理，再落到 vllm-ascend 的实现：DeviceInfo 采集信息，CpuAlloc 建池和绑定，不同 Ascend 产品按不同策略处理。</p>
         <div class="notes">
           <div class="note"><b>学习目标：</b>能解释为什么绑核有效、什么时候收益最大、什么时候反而危险。</div>
           <div class="note"><b>工程目标：</b>让 worker、runtime 线程、IRQ/polling 和系统噪声各在合理位置，减少 host-side 抖动。</div>
@@ -691,6 +691,94 @@ worker pool / helper pool / IRQ or polling pool / background pool
     </section>
 
     <section class="slide">
+      <div class="kicker">vLLM Ascend Entry</div>
+      <div class="content dense">
+        <h2>vllm-ascend 的绑核入口是一条固定执行链</h2>
+        <p>项目里不是启动时随便 taskset 一下，而是在 worker 初始化后按 rank 执行 `bind_cpus(rank_id)`。入口先判断是否 ARM CPU，再创建 `CpuAlloc`，最后由 `run_all()` 编排完整流程。</p>
+        <div class="terminal">bind_cpus(rank_id)
+  └─ is_arm_cpu()
+  └─ CpuAlloc(rank_id)
+       └─ run_all()
+            ├─ build_cpu_pools()
+            ├─ allocate()
+            ├─ print_plan()
+            ├─ bind_threads()
+            └─ bind_npu_irq()</div>
+        <div class="takeaway">vllm-ascend 的绑核是 worker 进程内执行的：每个 rank 负责自己的 worker 线程、内存迁移和当前 NPU 相关处理。</div>
+      </div>
+      <div class="footer"><span>vllm-ascend 调用链</span><span>11</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">vLLM Ascend Classes</div>
+      <div class="content dense">
+        <h2>两个核心类：DeviceInfo 采集，CpuAlloc 决策</h2>
+        <div class="matrix">
+          <div class="head">模块</div><div class="head">负责什么</div><div class="head">不负责什么</div>
+          <div>DeviceInfo</div><div>解析 `npu-smi info -m`、`npu-smi info`、`npu-smi info -t topo`、`Cpus_allowed_list`，得到 NPU、CPU、topo 基础信息</div><div>不做最终 CPU pool 策略，不执行 taskset</div>
+          <div>CpuAlloc</div><div>构建 NUMA map、按设备类型选择策略、分配 main/ACL/release/IRQ/UVB、执行绑定和内存迁移</div><div>不重新发现设备类型定义，不改业务调度逻辑</div>
+          <div>execute_command</div><div>统一执行 `npu-smi`、`lscpu`、`ps`、`taskset`、`migratepages` 等系统命令</div><div>不解释业务语义，只返回 stdout 和 return code</div>
+        </div>
+        <div class="takeaway">这个职责划分很重要：采集信息和执行策略分开，才能解释为什么某些测试只 mock DeviceInfo，某些测试要检查 CpuAlloc。</div>
+      </div>
+      <div class="footer"><span>DeviceInfo / CpuAlloc</span><span>12</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">Device Matrix</div>
+      <div class="content dense">
+        <h2>vllm-ascend 按设备类型选择绑核策略</h2>
+        <p>同一个 `cpu_binding.py` 同时服务 A2、A3、310P 和 Ascend 950。策略不能统一套模板，因为这些产品的 topo 信息、IRQ 行为、服务器结构和 runtime 线程诉求不一样。</p>
+        <div class="matrix">
+          <div class="head">设备</div><div class="head">CPU pool 策略</div><div class="head">线程/IRQ 行为</div>
+          <div>A2</div><div>`topo_affinity`，基于 NPU topo CPU affinity，复用原有 NUMA 扩展和同 pool 均分逻辑</div><div>默认预留 IRQ CPU，并尝试绑定 SQ/CQ IRQ</div>
+          <div>310P</div><div>`topo_affinity`，总体沿用 A2 风格的拓扑亲和路径</div><div>默认 IRQ 预留/绑定逻辑保持原实现</div>
+          <div>A3</div><div>`global_slice`，按全局 logical NPU 视角切分 allowed CPUs，避免 DP 组 CPU 重叠</div><div>IRQ 绑定按 A3 card/chip 映射查 board 信息</div>
+          <div>Ascend 950</div><div>专门的 cluster binding：按 topo 亲和 NUMA 拿一个 CPU cluster，hidden NPU 参与全局分配</div><div>绑定 `uvb_poll_window_thread`，跳过 IRQ，不单独绑定 ACL/release</div>
+        </div>
+        <div class="takeaway">vllm-ascend 的方案核心不是“哪种策略最好”，而是“每种硬件用和它形态匹配的策略”。</div>
+      </div>
+      <div class="footer"><span>设备策略矩阵</span><span>13</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">Ascend 950 Plan</div>
+      <div class="content dense">
+        <h2>Ascend 950 当前方案：UVB + worker cluster</h2>
+        <p>Ascend 950 的策略和 A2/A3 不同：系统级 `uvb_poll_window_thread` 需要绑定到 NUMA0 可用 CPU；worker 不再拿大段 NUMA CPU，而是按 topo 亲和 NUMA 分配一个 cluster。</p>
+        <div class="terminal">Ascend 950 flow:
+1. build_cpu_node_map(): 解析 lscpu -e=CPU,NODE
+2. bind_uvb_poll_window_threads(): NUMA0 CPUs - CPU0 -> uvb_poll_window_thread
+3. get_ascend_950_cluster_size(): Thread(s) per core 1/2 -> 8/16 CPUs
+4. build_ascend_950_cpu_pools(): 按 NPU topo 亲和 NUMA 切 cluster
+5. _allocate_ascend_950_roles(): main = cluster, acl/release = []</div>
+        <div class="notes">
+          <div class="note"><b>为什么 hidden NPU 参与：</b>多个 DP 组可能共享完整 cpuset，只按 visible NPU 切会重复用 CPU。</div>
+          <div class="note"><b>为什么不绑 ACL/release：</b>当前 Ascend 950 方案只要求 worker 主路径和子线程绑定到 cluster，ACL/release 不单独分池。</div>
+        </div>
+      </div>
+      <div class="footer"><span>Ascend 950 cluster-based binding</span><span>14</span></div>
+    </section>
+
+    <section class="slide">
+      <div class="kicker">A2 / A3 / IRQ</div>
+      <div class="content dense">
+        <h2>A2/A3/310P 保留原有 IRQ 和角色拆分</h2>
+        <p>非 Ascend 950 设备仍然走默认角色分配：CPU pool 前两个 CPU 预留给 IRQ，main 使用中间部分，ACL/release 使用尾部 CPU。随后通过 `taskset` 绑线程，通过 `/proc/irq/*/smp_affinity` 绑 IRQ。</p>
+        <div class="matrix">
+          <div class="head">角色</div><div class="head">默认设备</div><div class="head">Ascend 950</div>
+          <div>IRQ</div><div>预留 pool[0:2]，绑定 SQ/CQ IRQ</div><div>跳过 IRQ binding，不预留 IRQ CPU</div>
+          <div>main</div><div>pool[2:-2]，绑定主进程及子线程</div><div>整个 cluster 给 main/子线程</div>
+          <div>ACL</div><div>pool[-2]，单独绑定 `acl_thread`</div><div>不单独绑定</div>
+          <div>release</div><div>pool[-1]，单独绑定 `release_thread`</div><div>不单独绑定</div>
+          <div>memory</div><div>按最终 CPU pool 首 CPU 所在 NUMA 做 migratepages</div><div>同样执行 memory migration</div>
+        </div>
+        <div class="takeaway">这也是为什么日志必须区分设备类型：Ascend 950 不该打印 ACL/release 计划，A2/A3/310P 则需要。</div>
+      </div>
+      <div class="footer"><span>默认角色拆分和 IRQ 绑定</span><span>15</span></div>
+    </section>
+
+    <section class="slide">
       <div class="kicker">Strategies</div>
       <div class="content dense">
         <h2>不同硬件形态对应不同策略</h2>
@@ -704,7 +792,7 @@ worker pool / helper pool / IRQ or polling pool / background pool
         </div>
         <div class="takeaway">新产品适配时，先问“硬件真实分组是什么”，再决定算法。</div>
       </div>
-      <div class="footer"><span>策略必须服从硬件形态</span><span>11</span></div>
+      <div class="footer"><span>策略必须服从硬件形态</span><span>16</span></div>
     </section>
 
     <section class="slide">
@@ -720,7 +808,7 @@ worker pool / helper pool / IRQ or polling pool / background pool
         </ul>
         <div class="takeaway">容器里调绑核，第一条命令应该是查边界，而不是直接 taskset。</div>
       </div>
-      <div class="footer"><span>先确认边界，再谈策略</span><span>12</span></div>
+      <div class="footer"><span>先确认边界，再谈策略</span><span>17</span></div>
     </section>
 
     <section class="slide">
@@ -737,7 +825,7 @@ worker pool / helper pool / IRQ or polling pool / background pool
           <div class="card"><b>观测缺失</b><span>没有记录变更前后状态，就无法判断收益来自哪里。</span></div>
         </div>
       </div>
-      <div class="footer"><span>错误绑核比不绑更危险</span><span>13</span></div>
+      <div class="footer"><span>错误绑核比不绑更危险</span><span>18</span></div>
     </section>
 
     <section class="slide">
@@ -759,7 +847,7 @@ cat /proc/interrupts
 ls /proc/&lt;pid&gt;/task/*/comm | xargs -I{} sh -c 'echo {}; cat {}'</div>
         <div class="takeaway">验证顺序：先确认能用哪些 CPU，再确认线程实际在哪，最后对比性能。</div>
       </div>
-      <div class="footer"><span>没有观测，就没有调优</span><span>14</span></div>
+      <div class="footer"><span>没有观测，就没有调优</span><span>19</span></div>
     </section>
 
     <section class="slide">
@@ -778,7 +866,7 @@ ls /proc/&lt;pid&gt;/task/*/comm | xargs -I{} sh -c 'echo {}; cat {}'</div>
         </ul>
         <div class="takeaway">展示型 benchmark 的目标不是“证明任何场景都涨”，而是找出绑核最该发挥作用的系统压力场景。</div>
       </div>
-      <div class="footer"><span>测的是系统，不只是一个开关</span><span>15</span></div>
+      <div class="footer"><span>测的是系统，不只是一个开关</span><span>20</span></div>
     </section>
 
     <section class="slide">
@@ -795,7 +883,7 @@ ls /proc/&lt;pid&gt;/task/*/comm | xargs -I{} sh -c 'echo {}; cat {}'</div>
         </div>
         <div class="takeaway">适配新硬件时，不要先写算法；先收集足够信息，让策略自然长出来。</div>
       </div>
-      <div class="footer"><span>专家清单</span><span>16</span></div>
+      <div class="footer"><span>专家清单</span><span>21</span></div>
     </section>
 
     <section class="slide">
@@ -810,7 +898,7 @@ ls /proc/&lt;pid&gt;/task/*/comm | xargs -I{} sh -c 'echo {}; cat {}'</div>
         </div>
         <p><span class="badge">最终判断</span> 绑核不是固定线程这么简单，而是在复杂系统里为关键路径设计稳定的运行边界。</p>
       </div>
-      <div class="footer"><span>CPU Binding System Design</span><span>17</span></div>
+      <div class="footer"><span>CPU Binding System Design</span><span>22</span></div>
     </section>
   </main>
 

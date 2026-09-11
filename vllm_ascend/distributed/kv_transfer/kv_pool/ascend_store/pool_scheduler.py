@@ -683,14 +683,26 @@ class KVPoolScheduler:
 
         store_skip_tokens = num_external_hit_tokens
         if self.use_eagle:
-            # Recompute the generation-point hidden state. Round the remaining
-            # prefix down after reserving a token; an interior aligned hit does
-            # not require dropping another complete transfer block.
-            max_cacheable_tokens = self._floor_to_cache_transfer_granularity(request.num_tokens - 1)
-            num_external_hit_tokens = min(
-                num_external_hit_tokens,
-                max(num_computed_tokens, max_cacheable_tokens),
-            )
+            # Keep the draft model's recomputation zone intact: the
+            # generation-point hidden states must be freshly computed, and the
+            # local prefix-cache path already drops its trailing block
+            # (drop_eagle_block). Only trim the external hit when it reaches
+            # into the prompt's final granularity block, so that (local +
+            # external) never covers the last block whose KV the engine will
+            # rewrite during MTP draft/verify steps. Partial hits that stop on
+            # an interior block boundary carry a valid mamba state snapshot
+            # at that boundary and can be loaded as-is.
+            # The final granularity block starts at the lcm-aligned boundary
+            # containing the last token; num_tokens - lcm_block_size equals
+            # that boundary only for lcm-aligned prompts and over-trims
+            # unaligned prompts whose hit stops exactly on the boundary.
+            final_block_start = (request.num_tokens - 1) // self.lcm_block_size * self.lcm_block_size
+            hit_reaches_final_block = num_external_hit_tokens > final_block_start
+            if hit_reaches_final_block:
+                num_external_hit_tokens = max(
+                    num_computed_tokens,
+                    num_external_hit_tokens - self.lcm_block_size,
+                )
         if num_external_hit_tokens == request.num_tokens:
             num_external_hit_tokens -= 1
 

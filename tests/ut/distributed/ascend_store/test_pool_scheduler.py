@@ -149,23 +149,28 @@ class TestKVPoolScheduler(unittest.TestCase):
     @patch("vllm_ascend.distributed.kv_transfer.kv_pool.ascend_store.pool_scheduler.LookupKeyClient")
     def test_retention_interval_does_not_skip_external_lookup(self, mock_client_cls):
         """A retained checkpoint can be reused before two retention intervals."""
-        for token_count, lookup_hit in [(5083, 4096), (4083, 0), (8275, 4096)]:
-            with self.subTest(token_count=token_count):
-                mock_client_cls.reset_mock()
-                mock_client_cls.return_value.lookup.return_value = lookup_hit
-                scheduler = KVPoolScheduler(self._make_config(block_size=32), use_layerwise=False)
-                scheduler.retention_interval = 4096
-                request = MagicMock(
-                    prompt_token_ids=list(range(token_count)),
-                    num_tokens=token_count,
-                    request_id="retained-prefix",
-                    block_hashes=[b"h"] * (token_count // 32),
-                )
+        for use_eagle in (False, True):
+            for token_count, lookup_hit in [(5083, 4096), (5083, 0), (4083, 0), (8275, 4096)]:
+                with self.subTest(token_count=token_count, use_eagle=use_eagle):
+                    mock_client_cls.reset_mock()
+                    mock_client_cls.return_value.lookup.return_value = lookup_hit
+                    scheduler = KVPoolScheduler(self._make_config(block_size=4096), use_layerwise=False)
+                    scheduler.retention_interval = 4096
+                    scheduler.use_eagle = use_eagle
+                    request = MagicMock(
+                        prompt_token_ids=list(range(token_count)),
+                        num_tokens=token_count,
+                        request_id="retained-prefix",
+                        block_hashes=[b"h"] * (token_count // 4096),
+                    )
 
-                self.assertEqual(scheduler.get_num_new_matched_tokens(request, 0), (lookup_hit, False))
-                mock_client_cls.return_value.lookup.assert_called_once()
-                if lookup_hit:
-                    self.assertEqual(scheduler.load_specs[request.request_id].kvpool_cached_tokens, lookup_hit)
+                    self.assertEqual(scheduler.get_num_new_matched_tokens(request, 0), (lookup_hit, False))
+                    if token_count < scheduler.cache_transfer_granularity:
+                        mock_client_cls.return_value.lookup.assert_not_called()
+                    else:
+                        mock_client_cls.return_value.lookup.assert_called_once()
+                    if lookup_hit:
+                        self.assertEqual(scheduler.load_specs[request.request_id].kvpool_cached_tokens, lookup_hit)
 
     @patch("vllm_ascend.distributed.kv_transfer.kv_pool.ascend_store.pool_scheduler.LookupKeyClient")
     def test_mtp_retains_interior_hit_and_recomputes_prompt_tail(self, mock_client_cls):

@@ -90,46 +90,6 @@ def make_glm53_caches(plan):
 
 
 class TestGLM53Store(unittest.TestCase):
-    def test_nonlayerwise_failed_hybrid_reads_report_invalid_blocks(self):
-        plan = make_glm53_plan()
-        target = [[10, 11], [12], [13, 14], [15, 16], [17, 18]]
-        for load_async in (False, True):
-            for missing_result in (False, True):
-                with self.subTest(load_async=load_async, missing_result=missing_result):
-                    worker = make_worker(
-                        self,
-                        kv_cache_config=plan,
-                        use_mla=True,
-                        num_layers=4,
-                        extra_config={"load_async": load_async},
-                    )
-                    worker.register_kv_caches(make_glm53_caches(plan))
-                    worker.m_store.get.side_effect = (
-                        lambda keys, addresses, sizes, missing_result=missing_result: None
-                        if missing_result
-                        else [1] * len(keys)
-                    )
-                    metadata = AscendConnectorMetadata(set())
-                    metadata.add_request(
-                        ReqMeta(
-                            "failed-load",
-                            token_len_chunk=1024,
-                            block_ids_by_group=target,
-                            block_hashes=[bytes([i]) * 32 for i in (1, 2)],
-                            kv_cache_group_ids=list(range(5)),
-                            load_spec=LoadSpec(0, 1024, True),
-                        )
-                    )
-                    worker.start_load_kv(metadata)
-                    if load_async:
-                        worker.kv_recv_thread.request_queue.join()
-                    invalid = worker.get_block_ids_with_load_errors()
-                    self.assertTrue(invalid)
-                    self.assertTrue(invalid.intersection(target[4]))
-                    self.assertNotIn(target[1][0], invalid)
-                    self.assertEqual(worker.get_block_ids_with_load_errors(), set())
-                    self.doCleanups()
-
     def test_hash_geometry_and_safe_full_hit(self):
         plan = make_glm53_plan()
         for prefix_unit in (None, 128, 512):

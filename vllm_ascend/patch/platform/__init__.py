@@ -18,7 +18,6 @@ import os
 
 import vllm_ascend.patch.platform.patch_deepseek_v4_vision  # noqa
 import vllm_ascend.patch.platform.patch_distributed  # noqa
-import vllm_ascend.patch.platform.patch_hybrid_kv_load  # noqa
 import vllm_ascend.patch.platform.patch_kv_cache_utils  # noqa
 import vllm_ascend.patch.platform.patch_mamba_block_aligned_split  # noqa
 import vllm_ascend.patch.platform.patch_mla_prefill_backend  # noqa
@@ -103,9 +102,3 @@ import vllm_ascend.patch.platform.patch_kv_cache_dtype  # noqa
 #    Future Plan:
 #       Remove this patch when upstream supports per-group or backend-defined
 #       prefill boundaries.
-
-# patch_hybrid_kv_load.py patches Scheduler._update_requests_with_invalid_blocks.
-# Hybrid recurrent states cannot resume at an arbitrary attention-block boundary.
-# Invalidate the complete hybrid prefix on failed pool reads while retaining the
-# configured fail/recompute policy and upstream single-group handling. Remove
-# this compatibility patch when vLLM supports hybrid KV-load failure recovery.

@@ -517,7 +517,9 @@ class TestUtils(TestBase):
         mock_config.weight_nz_mode = 2
         with (
             mock.patch("vllm_ascend.utils.get_ascend_config", return_value=mock_config),
-            mock.patch("vllm_ascend.utils.is_310p", return_value=False),
+            mock.patch(
+                "vllm_ascend.utils.get_current_hardware_profile", return_value=get_hardware_profile(AscendDeviceType.A2)
+            ),
         ):
             weight = torch.empty(32, 64, dtype=torch.float8_e4m3fn)
             result = utils.maybe_trans_nz(weight, customize_dtype=torch.float8_e4m3fn)
@@ -532,7 +534,9 @@ class TestUtils(TestBase):
         mock_config.weight_nz_mode = 2
         with (
             mock.patch("vllm_ascend.utils.get_ascend_config", return_value=mock_config),
-            mock.patch("vllm_ascend.utils.is_310p", return_value=False),
+            mock.patch(
+                "vllm_ascend.utils.get_current_hardware_profile", return_value=get_hardware_profile(AscendDeviceType.A2)
+            ),
         ):
             weight = torch.empty(32, 64, dtype=torch.float8_e4m3fn)
             result = utils.maybe_trans_nz(weight, input_dtype=torch_npu.float4_e2m1fn_x2)
@@ -547,7 +551,9 @@ class TestUtils(TestBase):
         mock_config.weight_nz_mode = 2
         with (
             mock.patch("vllm_ascend.utils.get_ascend_config", return_value=mock_config),
-            mock.patch("vllm_ascend.utils.is_310p", return_value=False),
+            mock.patch(
+                "vllm_ascend.utils.get_current_hardware_profile", return_value=get_hardware_profile(AscendDeviceType.A2)
+            ),
         ):
             weight = torch.empty(32, 64, dtype=torch.float8_e4m3fn)
             result = utils.maybe_trans_nz(
@@ -567,7 +573,9 @@ class TestUtils(TestBase):
         mock_config.weight_nz_mode = 0
         with (
             mock.patch("vllm_ascend.utils.get_ascend_config", return_value=mock_config),
-            mock.patch("vllm_ascend.utils.is_310p", return_value=False),
+            mock.patch(
+                "vllm_ascend.utils.get_current_hardware_profile", return_value=get_hardware_profile(AscendDeviceType.A2)
+            ),
         ):
             weight = torch.randn(32, 64, dtype=torch.float16)
             result = utils.maybe_trans_nz(weight, customize_dtype=torch.float8_e4m3fn)
@@ -770,6 +778,16 @@ class TestIsMtpLayer(TestBase):
         # Mocked/partial hf_configs must not be classified as MTP layers.
         config = SimpleNamespace(num_hidden_layers="80")
         self.assertFalse(utils.is_mtp_layer(config, "model.layers.80.self_attn.attn"))
+
+
+def test_has_layer_idx_is_checked_per_model_instance():
+    target = SimpleNamespace(model=SimpleNamespace(start_layer=0))
+    draft = SimpleNamespace(model=SimpleNamespace())
+
+    assert utils.has_layer_idx(target)
+    assert not utils.has_layer_idx(draft)
+    assert utils.has_layer_idx(target)
+    assert not utils.has_layer_idx(None)
 
 
 class TestIsRlWeightUpdateEnabled(TestBase):

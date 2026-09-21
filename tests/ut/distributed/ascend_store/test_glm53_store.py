@@ -7,7 +7,7 @@ import queue
 import threading
 import unittest
 from dataclasses import replace
-from types import SimpleNamespace
+from types import MethodType, SimpleNamespace
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -321,7 +321,7 @@ class TestGLM53Store(unittest.TestCase):
         self.assertFalse(any("@1@" in key.split(block_hash.hex())[0] for key in readable))
         start_patch(self, "vllm_ascend.distributed.kv_transfer.kv_pool.ascend_store.pool_scheduler.importlib")
         scheduler = KVPoolScheduler(workers[0][0].vllm_config, True, workers[0][0].kv_cache_config)
-        scheduler.store_scheduler.batch_get_key_info.side_effect = infos
+        scheduler.store_scheduler.batch_is_readable.side_effect = lambda keys: [key in readable for key in keys]
         hit_request = SimpleNamespace(
             request_id="hit", prompt_token_ids=[1] * 513, num_tokens=513, block_hashes=[block_hash]
         )
@@ -362,7 +362,7 @@ class TestGLM53Store(unittest.TestCase):
         self.assertEqual(scheduler.get_num_new_matched_tokens(hit_request, 0), (0, False))
 
     def test_mooncake_layerwise_still_rejects_hybrid(self):
-        with self.assertRaisesRegex(ValueError, "Mooncake layerwise does not yet support hybrid"):
+        with self.assertRaisesRegex(ValueError, "Mooncake hybrid layerwise does not yet support recurrent Mamba state"):
             make_worker(self, kv_cache_config=make_glm53_plan(), use_layerwise=True, use_mla=True)
 
     def test_empty_final_layer_waits_for_pending_save_before_reusing_events(self):
@@ -381,6 +381,7 @@ class TestGLM53Store(unittest.TestCase):
             prefetch_layer_map={},
             kv_send_thread=SimpleNamespace(request_queue=pending, raise_if_failed=MagicMock()),
         )
+        worker._wait_for_final_layer_save = MethodType(KVPoolWorker._wait_for_final_layer_save, worker)
         worker.sync_save_events[1].record.side_effect = entered.set
 
         def save():
@@ -420,6 +421,7 @@ class TestGLM53Store(unittest.TestCase):
                 raise_if_failed=MagicMock(side_effect=[None, RuntimeError("save failed")]),
             ),
         )
+        worker._wait_for_final_layer_save = MethodType(KVPoolWorker._wait_for_final_layer_save, worker)
         with self.assertRaisesRegex(RuntimeError, "save failed"):
             KVPoolWorker.save_kv_layer(worker, AscendConnectorMetadata(set()))
 

@@ -173,6 +173,7 @@ class TestGLM53Store(unittest.TestCase):
                         )
                     )
                     worker.wait_for_save(metadata)
+                    worker.wait_for_previous_save()
                     workers.append((worker, caches))
                     self.doCleanups()
 

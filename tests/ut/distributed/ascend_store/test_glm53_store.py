@@ -120,7 +120,7 @@ class TestGLM53Store(unittest.TestCase):
         target = [[10, 11], [12], [13, 14], [15, 16], [17, 18]]
         for tp_size, load_async in ((1, False), (1, True), (2, False), (2, True)):
             with self.subTest(tp_size=tp_size, load_async=load_async):
-                stored = {}
+                stored: dict[str, list[bytes]] = {}
                 workers = []
 
                 def put(keys, addresses, sizes, stored=stored):

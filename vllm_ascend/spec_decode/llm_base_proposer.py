@@ -54,7 +54,6 @@ from vllm_ascend.distributed.kv_transfer.sparse_kv_offload.sparse_kv_offload_man
 )
 from vllm_ascend.distributed.parallel_state import get_lmhead_tp_group
 from vllm_ascend.models.deepseek_v4.dspark import DSparkDeepseekV4ForCausalLM
-from vllm_ascend.models.deepseek_v41.dspark import DSparkDeepseekV41ForCausalLM
 from vllm_ascend.models.llama_eagle3_vwn import Eagle3VwnLlamaForCausalLM
 from vllm_ascend.ops.triton.spec_decode.utils import prepare_inputs_padded_kernel
 from vllm_ascend.ops.triton.triton_utils import get_vectorcore_num
@@ -84,8 +83,12 @@ _HIDDEN_STATE_DRAFTER_TYPES: tuple[type, ...] = (
     Eagle3VwnLlamaForCausalLM,
     Eagle3DeepseekV2ForCausalLM,
     DSparkDeepseekV4ForCausalLM,
-    DSparkDeepseekV41ForCausalLM,
 )
+
+if not vllm_version_is("0.29.0"):
+    from vllm_ascend.models.deepseek_v41.dspark import DSparkDeepseekV41ForCausalLM
+
+    _HIDDEN_STATE_DRAFTER_TYPES += (DSparkDeepseekV41ForCausalLM,)
 
 
 def greedy_sample(logits: torch.Tensor) -> torch.Tensor:
@@ -471,6 +474,11 @@ class AscendSpecDecodeBaseProposer(SpecDecodeBaseProposer):
         self._maybe_share_embeddings(target_language_model)
         self._maybe_share_topk_indices(target_language_model)
         self._maybe_share_lm_head(target_language_model)
+
+        # Align draft weights before precomputing draft hidden states.
+        if self.method == "dspark" and hasattr(self.model, "post_process"):
+            with set_current_vllm_config(self.vllm_config):
+                self.model.post_process(self.vllm_config)
 
         if (
             self.parallel_drafting
@@ -1161,6 +1169,19 @@ class AscendSpecDecodeBaseProposer(SpecDecodeBaseProposer):
         multi_steps_attn_metadata, attn_metadata_i = self.build_draft_attn_metadata(
             common_attn_metadata, num_input_tokens, num_tokens
         )
+
+        # Merged step 0 is the draft model's first-pass/prefill forward, not a
+        # one-token draft decode step. It reuses the target-model layout and
+        # therefore keeps the unadjusted sequence lengths. Before building the
+        # remaining one-token draft decode steps, remove the rejected target
+        # tokens from an independent NPU buffer. This mirrors upstream vLLM's
+        # rejection-correction boundary while preserving step 0 metadata and
+        # the model runner's shared seq_lens.
+        if not self.parallel_drafting and self.num_speculative_tokens > 1 and num_rejected_tokens_gpu is not None:
+            next_step_seq_lens = self.seq_lens_group[1][: common_attn_metadata.seq_lens.shape[0]]
+            next_step_seq_lens.copy_(common_attn_metadata.seq_lens)
+            next_step_seq_lens[:batch_size].sub_(num_rejected_tokens_gpu[:batch_size])
+            common_attn_metadata.seq_lens = next_step_seq_lens
 
         if self.uses_mrope:
             used_update_positions = self.mrope_positions[:, token_indices_to_sample]

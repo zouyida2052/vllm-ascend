@@ -93,7 +93,6 @@ class AscendStoreCoordinator:
         )
 
         self.kv_cache_groups = kv_cache_groups
-        self.cacheable_group_ids = infer_cacheable_group_ids(kv_cache_groups)
         self.hash_block_size = hash_block_size
         self.lcm_block_size = scheduler_block_size
         self.use_eagle = use_eagle
@@ -101,6 +100,7 @@ class AscendStoreCoordinator:
         self.group_block_sizes = group_block_sizes
         self.group_cache_families = group_cache_families
         self.group_effective_block_sizes = list(group_block_sizes)
+        self.cacheable_group_ids = infer_cacheable_group_ids(kv_cache_groups)
         for group_id in self.cacheable_group_ids:
             effective_block_size = self.group_effective_block_sizes[group_id]
             assert effective_block_size % hash_block_size == 0, "block_size must be divisible by hash_block_size"

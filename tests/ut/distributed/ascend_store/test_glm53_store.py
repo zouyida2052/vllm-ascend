@@ -362,7 +362,7 @@ class TestGLM53Store(unittest.TestCase):
         self.assertEqual(scheduler.get_num_new_matched_tokens(hit_request, 0), (0, False))
 
     def test_mooncake_layerwise_still_rejects_hybrid(self):
-        with self.assertRaisesRegex(ValueError, "Mooncake hybrid layerwise does not yet support recurrent Mamba state"):
+        with self.assertRaisesRegex(ValueError, "AscendStore private KV state requires non-layerwise transfer"):
             make_worker(self, kv_cache_config=make_glm53_plan(), use_layerwise=True, use_mla=True)
 
     def test_empty_final_layer_waits_for_pending_save_before_reusing_events(self):
@@ -373,6 +373,7 @@ class TestGLM53Store(unittest.TestCase):
         errors = []
         events = [threading.Event(), threading.Event()]
         worker = SimpleNamespace(
+            use_block_key_layerwise=False,
             num_layers=2,
             current_layer=1,
             sync_save_events=[MagicMock(), MagicMock()],
@@ -410,6 +411,7 @@ class TestGLM53Store(unittest.TestCase):
         pending = queue.Queue()
         pending.put("failed-save")
         worker = SimpleNamespace(
+            use_block_key_layerwise=False,
             num_layers=1,
             current_layer=0,
             sync_save_events=[MagicMock()],

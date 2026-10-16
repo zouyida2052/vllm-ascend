@@ -1297,7 +1297,6 @@ def _publish_action_artifacts(
     action_identity: str,
     artifacts: Sequence[dict],
 ) -> None:
-    publish_dir.mkdir(parents=True, exist_ok=True)
     publish_state_dir.mkdir(parents=True, exist_ok=True)
 
     lock_path = publish_state_dir / ".publish.lock"
@@ -1325,9 +1324,9 @@ def _publish_action_artifacts(
         if not owners.get("initialized", False):
             if publish_dir.exists():
                 shutil.rmtree(publish_dir)
-            publish_dir.mkdir(parents=True, exist_ok=True)
             owners["initialized"] = True
 
+        publish_dir.mkdir(parents=True, exist_ok=True)
         action_state = _load_publish_state(
             action_state_path,
             {

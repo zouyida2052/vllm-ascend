@@ -1249,6 +1249,7 @@ class TestNPUModelRunnerKVCache(unittest.TestCase):
         return runner
 
     def _check_load_model_prolog_budget(self, with_draft, pcp_enabled):
+        """Check persistent writer weights are counted during model loading."""
         runner = self._build_runner()
         runner.model_config.model = "test-model"
         runner.model_config.multimodal_config = None
@@ -1283,6 +1284,7 @@ class TestNPUModelRunnerKVCache(unittest.TestCase):
             impl.v_head_dim = 1
             impl.enable_mlapo = False
             impl.fa_quant_layer = False
+            impl.use_flashmla = False
             impl.pcp_enabled = pcp_enabled
             impl.dcp_enabled = False
             impl.supports_prolog_v3_writer = lambda: True

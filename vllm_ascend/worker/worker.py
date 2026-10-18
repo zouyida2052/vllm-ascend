@@ -981,6 +981,7 @@ class NPUWorker(WorkerBase):
                     self.local_rank,
                     npu_id=current_platform.device_id_to_physical_device_id(self.local_rank),
                     migrate_memory=not (engram_config is not None and engram_config.cpu_offload),
+                    vllm_config=self.vllm_config,
                 )
             except Exception as e:
                 logger.warning("Bind cpus failed in rank%s: %s Skip binding cpu.", self.local_rank, e)

@@ -178,6 +178,13 @@ class CPUBindingMode(Enum):
     GLOBAL_SLICE = "global_slice"
 
 
+class CPUBindingBackend(Enum):
+    """Owner of worker affinity and its conditional host tuning steps."""
+
+    NATIVE = "native"
+    MSBOOST = "msboost"
+
+
 class DeviceAdaptorFamily(Enum):
     """Device operation adaptor implementation families."""
 
@@ -238,6 +245,7 @@ class HardwareProfile:
     # Mutually exclusive implementation and behavior selections.
     attention_backend_family: AttentionBackendFamily
     cpu_binding_mode: CPUBindingMode
+    cpu_binding_backend: CPUBindingBackend
     default_worker_cls: str
     device_adaptor_family: DeviceAdaptorFamily
     device_addressing_mode: DeviceAddressingMode
@@ -294,6 +302,7 @@ _HARDWARE_PROFILES: Mapping[AscendDeviceType, HardwareProfile] = MappingProxyTyp
             _device_type=AscendDeviceType.A2,
             attention_backend_family=AttentionBackendFamily.STANDARD,
             cpu_binding_mode=CPUBindingMode.TOPO_AFFINITY,
+            cpu_binding_backend=CPUBindingBackend.NATIVE,
             default_worker_cls=_DEFAULT_WORKER_CLS,
             device_adaptor_family=DeviceAdaptorFamily.STANDARD,
             device_addressing_mode=DeviceAddressingMode.DIRECT,
@@ -307,6 +316,7 @@ _HARDWARE_PROFILES: Mapping[AscendDeviceType, HardwareProfile] = MappingProxyTyp
             _device_type=AscendDeviceType.A3,
             attention_backend_family=AttentionBackendFamily.STANDARD,
             cpu_binding_mode=CPUBindingMode.GLOBAL_SLICE,
+            cpu_binding_backend=CPUBindingBackend.MSBOOST,
             default_worker_cls=_DEFAULT_WORKER_CLS,
             device_adaptor_family=DeviceAdaptorFamily.STANDARD,
             device_addressing_mode=DeviceAddressingMode.DUAL_CHIP_CARD,
@@ -325,6 +335,7 @@ _HARDWARE_PROFILES: Mapping[AscendDeviceType, HardwareProfile] = MappingProxyTyp
             _device_type=AscendDeviceType._310P,
             attention_backend_family=AttentionBackendFamily.COMPATIBILITY,
             cpu_binding_mode=CPUBindingMode.TOPO_AFFINITY,
+            cpu_binding_backend=CPUBindingBackend.NATIVE,
             default_worker_cls="vllm_ascend._310p.worker_310p.NPUWorker310",
             device_adaptor_family=DeviceAdaptorFamily.COMPATIBILITY,
             device_addressing_mode=DeviceAddressingMode.DIRECT,
@@ -349,6 +360,7 @@ _HARDWARE_PROFILES: Mapping[AscendDeviceType, HardwareProfile] = MappingProxyTyp
             _device_type=AscendDeviceType.A5,
             attention_backend_family=AttentionBackendFamily.STANDARD,
             cpu_binding_mode=CPUBindingMode.TOPO_AFFINITY,
+            cpu_binding_backend=CPUBindingBackend.MSBOOST,
             default_worker_cls=_DEFAULT_WORKER_CLS,
             device_adaptor_family=DeviceAdaptorFamily.FP8_OPTIMIZED,
             device_addressing_mode=DeviceAddressingMode.DIRECT,

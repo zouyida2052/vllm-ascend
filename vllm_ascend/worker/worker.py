@@ -974,7 +974,7 @@ class NPUWorker(WorkerBase):
         # Keep thread affinity after warmup and capture. Engram HOST_UVA tables
         # are already registered here; process-wide migration must not revisit
         # their pinned backing, which may also be shared across NUMA nodes.
-        if get_ascend_config().enable_cpu_binding:
+        if get_ascend_config().enable_cpu_binding is not False:
             engram_config = getattr(self.vllm_config, "engram_config", None)
             try:
                 bind_cpus(

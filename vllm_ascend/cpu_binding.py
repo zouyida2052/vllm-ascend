@@ -15,10 +15,8 @@ import psutil
 import regex as re
 from vllm.logger import logger
 
-from vllm_ascend.device.hardware_profile import (
-    CPUBindingBackend,
-    get_current_hardware_profile,
-)
+from vllm_ascend.device.device_config import get_ascend_device_type
+from vllm_ascend.device.hardware import AscendDeviceType
 
 if TYPE_CHECKING:
     from vllm.config import VllmConfig
@@ -33,12 +31,6 @@ class CPUBindingDeployment:
     dp_size_local: int
     dp_start_rank: int
     enable_ep: bool
-    nnodes: int
-    backend: str | None
-    dp_backend: str
-    pcp_size: int
-    elastic: bool
-    external_dp: bool
     reason: str | None
 
 
@@ -72,12 +64,6 @@ def prepare_cpu_binding(vllm_config: VllmConfig) -> None:
         parallel.data_parallel_size_local,
         parallel.data_parallel_rank - (parallel.data_parallel_rank_local or 0),
         parallel.enable_expert_parallel,
-        parallel.nnodes,
-        backend,
-        dp_backend,
-        parallel.prefill_context_parallel_size,
-        parallel.enable_elastic_ep,
-        external_dp,
         reason,
     )
 
@@ -95,9 +81,6 @@ def _bind_msboost(vllm_config: VllmConfig | None, npu_id: int, migrate_memory: b
         from msboost.api import apply_vllm_affinity
         from vllm.distributed.parallel_state import get_pp_group, get_tp_group
 
-        from vllm_ascend.ascend_config import get_ascend_config
-
-        config = get_ascend_config()
         coordinate = (
             vllm_config.parallel_config.data_parallel_index,
             get_pp_group().rank_in_group,
@@ -117,8 +100,6 @@ def _bind_msboost(vllm_config: VllmConfig | None, npu_id: int, migrate_memory: b
             coordinate=coordinate,
             device=npu_id,
             migrate_memory=migrate_memory,
-            strategy=config.msboost_strategy,
-            timeout_seconds=config.msboost_timeout_seconds,
             logger=logger,
         )
         if result.get("status") != "completed":
@@ -650,7 +631,7 @@ def bind_cpus(
     if not is_arm_cpu():
         logger.info("CPU binding skipped: non-ARM CPU detected.")
         return
-    if get_current_hardware_profile().cpu_binding_backend is CPUBindingBackend.MSBOOST:
+    if get_ascend_device_type() in (AscendDeviceType.A3, AscendDeviceType.A5):
         _bind_msboost(vllm_config, npu_id, migrate_memory)
         return
     binder = CpuAlloc(rank_id, npu_id=npu_id)

@@ -563,10 +563,6 @@ class AscendConfig:
 
     # ---- user-input switches: bool/int/list/str, auto type validation ----
     enable_cpu_binding: bool = True
-    msboost_strategy: Literal[
-        "auto", "cluster", "numa", "npu_topo.isolated", "npu_topo.colocated", "npu_topo.shared"
-    ] = "auto"
-    msboost_timeout_seconds: float = 120.0
     multistream_dsv4_dsa_overlap: bool = True
     # Prepare Engram hashes, lookups and DP/TP exchanges on an auxiliary stream;
     # FULL graphs wait on descriptor-specific external events at consumers.
@@ -660,8 +656,6 @@ class AscendConfig:
 
     @model_validator(mode="after")
     def _validate_user_input_ranges(self):
-        if not math.isfinite(self.msboost_timeout_seconds) or self.msboost_timeout_seconds <= 0:
-            raise ValueError("msboost_timeout_seconds must be a finite positive number")
         if self.weight_nz_mode not in (0, 1, 2):
             raise ValueError(f"weight_nz_mode must be one of 0, 1, or 2; got {self.weight_nz_mode}")
         # TODO(zzzzwwjj): remove it after deprecating `enable_mc2_hierarchy_comm`.

@@ -1,7 +1,6 @@
 from vllm_ascend.device.device_config import DeviceConfig, get_device_config
 from vllm_ascend.device.hardware_profile import (
     AttentionBackendFamily,
-    CPUBindingBackend,
     CPUBindingMode,
     DeviceAdaptorFamily,
     DeviceAddressingMode,
@@ -16,7 +15,6 @@ from vllm_ascend.device.hardware_profile import (
 
 __all__ = [
     "AttentionBackendFamily",
-    "CPUBindingBackend",
     "CPUBindingMode",
     "DeviceAdaptorFamily",
     "DeviceAddressingMode",

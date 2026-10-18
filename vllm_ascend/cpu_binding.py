@@ -8,11 +8,12 @@ import shutil
 import subprocess
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 from uuid import uuid4
 
 import psutil
 import regex as re
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from vllm.logger import logger
 
 from vllm_ascend.device.device_config import get_ascend_device_type
@@ -20,6 +21,47 @@ from vllm_ascend.device.hardware import AscendDeviceType
 
 if TYPE_CHECKING:
     from vllm.config import VllmConfig
+
+
+class _MsboostOptions(BaseModel):
+    """Optional tuning; deployment identity and devices always come from vLLM."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    strategy: Literal["auto", "cluster", "numa", "npu_topo.isolated", "npu_topo.colocated", "npu_topo.shared"] = "auto"
+    wait_policy: Literal["all"] = "all"
+    registration_timeout_seconds: float = Field(default=120.0, gt=0, allow_inf_nan=False, strict=True)
+    npu_numas: dict[int, int] | None = None
+
+    @field_validator("npu_numas", mode="before")
+    @classmethod
+    def validate_npu_numas(cls, value):
+        if value is None:
+            return None
+        if not isinstance(value, dict) or not value:
+            raise ValueError("npu_numas must be a nonempty physical-NPU-to-NUMA mapping")
+        mapping = {}
+        for device, node in value.items():
+            if isinstance(device, str) and device.isdecimal():
+                device = int(device)
+            if type(device) is not int or device < 0 or type(node) is not int or node < 0:
+                raise ValueError("npu_numas keys and values must be nonnegative integers")
+            mapping[device] = node
+        return mapping
+
+    @model_validator(mode="after")
+    def validate_mapping_strategy(self):
+        if self.npu_numas is not None and not self.strategy.startswith("npu_topo."):
+            raise ValueError("npu_numas requires an npu_topo strategy")
+        return self
+
+
+def resolve_msboost_options(options: dict[str, object]) -> dict[str, object]:
+    """Merge user tuning with defaults, without importing the optional library."""
+    try:
+        return _MsboostOptions.model_validate(options).model_dump(exclude_none=True)
+    except ValueError as exc:
+        raise ValueError(f"msboost_options: {exc}") from exc
 
 
 @dataclass(frozen=True)
@@ -100,6 +142,7 @@ def _bind_msboost(vllm_config: VllmConfig | None, npu_id: int, migrate_memory: b
             coordinate=coordinate,
             device=npu_id,
             migrate_memory=migrate_memory,
+            options=resolve_msboost_options((vllm_config.additional_config or {}).get("msboost_options", {})),
             logger=logger,
         )
         if result.get("status") != "completed":

@@ -9,7 +9,6 @@ import subprocess
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 import psutil
 import regex as re
@@ -23,15 +22,13 @@ if TYPE_CHECKING:
     from vllm.config import VllmConfig
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class CPUBindingDeployment:
     """Pre-fork facts, copied with VllmConfig; never reconstructed by workers."""
 
-    instance_id: str
     sizes: tuple[int, int, int]
     dp_size_local: int
     dp_start_rank: int
-    enable_ep: bool
     devices: tuple[int, ...]
     allowed_cpus: tuple[int, ...]
     reason: str | None
@@ -75,14 +72,12 @@ def prepare_cpu_binding(vllm_config: VllmConfig) -> None:
         except (ValueError, IndexError, OSError) as exc:
             reason = f"cannot capture shared CPU/device layout: {exc}"
     vllm_config._ascend_cpu_binding_deployment = CPUBindingDeployment(
-        uuid4().hex,
-        sizes,
-        parallel.data_parallel_size_local,
-        parallel.data_parallel_rank - (parallel.data_parallel_rank_local or 0),
-        parallel.enable_expert_parallel,
-        devices,
-        allowed_cpus,
-        reason,
+        sizes=sizes,
+        dp_size_local=parallel.data_parallel_size_local,
+        dp_start_rank=parallel.data_parallel_rank - (parallel.data_parallel_rank_local or 0),
+        devices=devices,
+        allowed_cpus=allowed_cpus,
+        reason=reason,
     )
 
 
@@ -112,12 +107,10 @@ def _bind_msboost(vllm_config: VllmConfig | None, npu_id: int, migrate_memory: b
         )
         dp_size, pp_size, tp_size = deployment.sizes
         result = apply_vllm_affinity(
-            instance_id=deployment.instance_id,
             dp_size=dp_size,
             dp_size_local=deployment.dp_size_local,
             dp_start_rank=deployment.dp_start_rank,
             tp_size=tp_size,
-            enable_ep=deployment.enable_ep,
             pp_size=pp_size,
             coordinate=coordinate,
             device=npu_id,

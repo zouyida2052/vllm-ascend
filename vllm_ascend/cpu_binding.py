@@ -14,6 +14,7 @@ from uuid import uuid4
 import psutil
 import regex as re
 from vllm.logger import logger
+from vllm.platforms import current_platform
 
 from vllm_ascend.device.device_config import get_ascend_device_type
 from vllm_ascend.device.hardware import AscendDeviceType
@@ -31,6 +32,8 @@ class CPUBindingDeployment:
     dp_size_local: int
     dp_start_rank: int
     enable_ep: bool
+    devices: tuple[int, ...]
+    allowed_cpus: tuple[int, ...]
     reason: str | None
 
 
@@ -58,12 +61,27 @@ def prepare_cpu_binding(vllm_config: VllmConfig) -> None:
         reason = "elastic membership is not supported"
     elif external_dp:
         reason = "independently launched DP membership is not supported"
+    devices: tuple[int, ...] = ()
+    allowed_cpus: tuple[int, ...] = ()
+    if reason is None:
+        try:
+            # Use the same framework mapping as NPUWorker, preserving visibility order.
+            # Only the participating local slots are included, not every visible device.
+            devices = tuple(
+                current_platform.device_id_to_physical_device_id(index)
+                for index in range(sizes[0] * sizes[1] * sizes[2])
+            )
+            allowed_cpus = tuple(sorted(os.sched_getaffinity(0)))
+        except (ValueError, IndexError, OSError) as exc:
+            reason = f"cannot capture shared CPU/device layout: {exc}"
     vllm_config._ascend_cpu_binding_deployment = CPUBindingDeployment(
         uuid4().hex,
         sizes,
         parallel.data_parallel_size_local,
         parallel.data_parallel_rank - (parallel.data_parallel_rank_local or 0),
         parallel.enable_expert_parallel,
+        devices,
+        allowed_cpus,
         reason,
     )
 
@@ -84,7 +102,7 @@ def _bind_msboost(vllm_config: VllmConfig | None, npu_id: int, migrate_memory: b
         # A configuration object enables binding and overrides component defaults.
         # Let msboost validate its own tuning keys instead of duplicating its schema.
         binding_config = (vllm_config.additional_config or {}).get("enable_cpu_binding", True)
-        options = {"strategy": "auto", "wait_policy": "all", "registration_timeout_seconds": 120.0}
+        options = {"strategy": "auto"}
         if isinstance(binding_config, dict):
             options.update(binding_config)
         coordinate = (
@@ -92,8 +110,6 @@ def _bind_msboost(vllm_config: VllmConfig | None, npu_id: int, migrate_memory: b
             get_pp_group().rank_in_group,
             get_tp_group().rank_in_group,
         )
-        # Match affinity_vllm.py's deployment inputs. CPU placement, runtime
-        # threads and host tuning belong to msboost, including capability gaps.
         dp_size, pp_size, tp_size = deployment.sizes
         result = apply_vllm_affinity(
             instance_id=deployment.instance_id,
@@ -108,6 +124,8 @@ def _bind_msboost(vllm_config: VllmConfig | None, npu_id: int, migrate_memory: b
             migrate_memory=migrate_memory,
             options=options,
             logger=logger,
+            devices=deployment.devices,
+            allowed_cpus=deployment.allowed_cpus,
         )
         if result.get("status") != "completed":
             logger.warning("[cpu_binding.msboost.incomplete] coordinate=%s result=%s", coordinate, result)

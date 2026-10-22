@@ -91,11 +91,11 @@ def _bind_msboost(vllm_config: VllmConfig | None, npu_id: int, migrate_memory: b
         logger.warning("[cpu_binding.msboost.skipped] %s", deployment.reason)
         return
     try:
-        from msboost.api import apply_vllm_affinity
+        from affinity_bind.api import apply_vllm_affinity
         from vllm.distributed.parallel_state import get_pp_group, get_tp_group
 
         # A configuration object enables binding and overrides component defaults.
-        # Let msboost validate its own tuning keys instead of duplicating its schema.
+        # Let affinity_bind validate its own tuning keys instead of duplicating its schema.
         binding_config = (vllm_config.additional_config or {}).get("enable_cpu_binding", True)
         options = {"strategy": "auto"}
         if isinstance(binding_config, dict):

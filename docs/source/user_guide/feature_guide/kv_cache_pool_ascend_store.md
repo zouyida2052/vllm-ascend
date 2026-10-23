@@ -1678,6 +1678,31 @@ Note the following when enabling KV Pool for DSv4. Other historical known issues
 - You must add `--no-disable-hybrid-kv-cache-manager` at startup; otherwise the service runs into an OOM problem during startup.
 - DSv4 stores the states of all compression ratio families in full, and fully storing a sequence of 1M tokens takes about 300GB of space. This is expected and is the same behavior as upstream vLLM; further optimization depends on the vLLM community.
 
+#### Memcache non-layerwise group-0 transfer compaction
+
+For the validated `DeepSeek-V4-Pro-0813` model key, the non-layerwise
+Memcache GET/PUT path removes duplicate indexer spans in group 0, cache role
+`kv`, cache family `default`. It retains the enclosing data-and-scale span:
+
+| Block size | Original per-layer sizes (bytes) | Compacted sizes (bytes) |
+| --- | --- | --- |
+| 32 | 19456, 4096, 128, 4224 | 19456, 4224 |
+| 128 | 77824, 16384, 512, 16896 | 77824, 16896 |
+
+Compaction requires both the exact size pattern and verified aliasing:
+the combined span starts at the data address, and the scale address immediately
+follows the data. Every layer in an object must match before that object is
+compacted. Other model keys, groups, families and unrecognized layouts keep
+their original transfers. The layerwise GVA path is unaffected.
+
+**Cache compatibility:** this changes the packed object size and layout without
+changing its lookup key. Use a fresh, isolated Memcache cache namespace and
+deploy the same revision on all readers and writers, including P and D nodes.
+Do not reuse objects written before this change or mix old and new workers.
+For rollback, stop the new workers and restore the previous revision against
+its original isolated cache or another fresh cache. Do not delete shared cache
+data as part of rollout or rollback.
+
 ### Issue 7: AscendStore KV Pool Known Issues (v0.23.0)
 
 For the v0.23.0 AscendStore KV Pool known issues, see [vllm-ascend issue #12390](https://github.com/vllm-project/vllm-ascend/issues/12390).

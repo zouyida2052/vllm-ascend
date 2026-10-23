@@ -39,6 +39,51 @@ def _is_device_sdma() -> bool:
 MEMCACHE_THREAD_START_WAIT_S = 0.1
 MEMCACHE_SSD_MEDIA_TYPE = 2
 
+# The validated non-layerwise DSV4 group-0 layout contains, per layer:
+# [KV, indexer data, indexer scale, indexer data + scale].
+_GROUP0_MODEL_PREFIX = "DeepSeek-V4-Pro-0813@"
+_GROUP0_KEY_TAG = "@group:0@cache_role:kv@cache_family:default@"
+_GROUP0_LAYER_SEGMENTS = 4
+_GROUP0_TRANSFER_SIZES = (
+    (19456, 4096, 128, 4224),  # block_size=32
+    (77824, 16384, 512, 16896),  # block_size=128
+)
+
+
+def _compact_group0_transfer_args(
+    keys: list[str], addrs: list[list[int]], sizes: list[list[int]]
+) -> tuple[list[list[int]], list[list[int]]]:
+    """Remove only the validated duplicate indexer spans, without mutation.
+
+    GET and PUT must use the same packed layout. This changes stored object
+    sizes: deploy all readers/writers together against a fresh isolated cache;
+    existing objects and mixed revisions are not compatible. Unknown models,
+    groups, sizes or address relationships retain their original layout.
+    The layerwise GVA path does not call this helper.
+    """
+    if len(keys) != len(addrs) or len(keys) != len(sizes):
+        raise ValueError("Memcache key/address/size batch lengths must match")
+    compact_addrs, compact_sizes = list(addrs), list(sizes)
+    for index, key in enumerate(keys):
+        if not (key.startswith(_GROUP0_MODEL_PREFIX) and _GROUP0_KEY_TAG in key):
+            continue
+        row, counts = addrs[index], sizes[index]
+        if not counts or len(row) != len(counts) or len(counts) % _GROUP0_LAYER_SEGMENTS:
+            continue
+        # Validate every layer before compacting any part of this object.
+        # Equal lengths alone do not prove that two buffers alias.
+        if any(
+            tuple(counts[offset : offset + _GROUP0_LAYER_SEGMENTS]) not in _GROUP0_TRANSFER_SIZES
+            or row[offset + 1] != row[offset + 3]
+            or row[offset + 2] != row[offset + 1] + counts[offset + 1]
+            for offset in range(0, len(counts), _GROUP0_LAYER_SEGMENTS)
+        ):
+            continue
+        keep = [segment for offset in range(0, len(counts), _GROUP0_LAYER_SEGMENTS) for segment in (offset, offset + 3)]
+        compact_addrs[index] = [row[segment] for segment in keep]
+        compact_sizes[index] = [counts[segment] for segment in keep]
+    return compact_addrs, compact_sizes
+
 
 def _validate_device_ub_qos() -> None:
     """Validate MF_DEVICE_UB_QOS used by the MemCache store transfers.
@@ -475,6 +520,7 @@ class MemcacheBackend(Backend):
             return
         assert self.store is not None
         try:
+            addr, size = _compact_group0_transfer_args(key, addr, size)
             res = self.store.batch_get_into_layers(key, addr, size, MmcDirect.COPY_G2L.value)
             failed_codes = [int(value) for value in res if value != 0]
             failed_count = len(failed_codes)
@@ -508,6 +554,7 @@ class MemcacheBackend(Backend):
         self.ensure_initialized()
         assert self.store is not None
         try:
+            addr, size = _compact_group0_transfer_args(key, addr, size)
             res = self.store.batch_put_from_layers(key, addr, size, MmcDirect.COPY_L2G.value)
             failed_codes = [int(value) for value in res if value != 0]
             failed_count = len(failed_codes)

@@ -2,27 +2,20 @@
 # SPDX-FileCopyrightText: Copyright contributors to the vllm-ascend project
 
 import copy
-import unittest
+import random
 from unittest.mock import MagicMock
+
+import pytest
 
 import tests.ut.distributed.ascend_store._mock_deps  # noqa: F401, E402
 from vllm_ascend.distributed.kv_transfer.kv_pool.ascend_store.backend.memcache_backend import (
     MemcacheBackend,
     MmcDirect,
-    _compact_group0_transfer_args,
+    _compact_transfer_args,
 )
 
-_KEY = "DeepSeek-V4-Pro-0813@tp:0@group:0@cache_role:kv@cache_family:default@hash"
 
-
-def _layer(block_size, base):
-    scale = block_size // 32
-    return [base, base + 100000, base + 100000 + 4096 * scale, base + 100000], [
-        size * scale for size in (19456, 4096, 128, 4224)
-    ]
-
-
-def _coverage(addrs, sizes):
+def coverage(addrs, sizes):
     """Independently compute the union of half-open byte ranges."""
     merged = []
     for start, end in sorted((addr, addr + size) for addr, size in zip(addrs, sizes, strict=True)):
@@ -33,125 +26,139 @@ def _coverage(addrs, sizes):
     return merged
 
 
-class TestMemcacheGroup0Compaction(unittest.TestCase):
-    def test_verified_layout_preserves_coverage_and_order(self):
-        for block_size in (32, 128):
-            for num_layers in (1, 29, 32, 61):
-                with self.subTest(block_size=block_size, num_layers=num_layers):
-                    rows = [_layer(block_size, layer * 200000) for layer in range(num_layers)]
-                    addr = [value for row, _ in rows for value in row]
-                    size = [value for _, row in rows for value in row]
-                    original = copy.deepcopy(([addr], [size]))
-                    compact_addr, compact_size = _compact_group0_transfer_args([_KEY], [addr], [size])
-                    self.assertEqual(compact_addr[0], [value for row, _ in rows for value in (row[0], row[3])])
-                    self.assertEqual(compact_size[0], [value for _, row in rows for value in (row[0], row[3])])
-                    self.assertEqual(_coverage(addr, size), _coverage(compact_addr[0], compact_size[0]))
-                    self.assertEqual(len(compact_size[0]), num_layers * 2)
-                    self.assertEqual(sum(size) - sum(compact_size[0]), num_layers * 4224 * (block_size // 32))
-                    self.assertEqual(([addr], [size]), original)
+@pytest.mark.parametrize(
+    "addrs,sizes,retained",
+    [
+        ([], [], []),
+        ([100], [10], [0]),
+        ([100, 100], [10, 10], [0]),
+        ([100, 200], [10, 10], [0, 1]),
+        ([100, 110], [10, 10], [0, 1]),
+        ([100, 105], [10, 10], [0, 1]),
+        ([100, 100], [10, 20], [1]),
+        ([105, 100], [5, 20], [1]),
+        ([100, 110, 100], [10, 5, 15], [2]),
+        ([100, 120, 105], [10, 10, 20], [0, 1, 2]),
+        ([200, 105, 100], [10, 5, 20], [0, 2]),
+        ([100, 105, 110], [10, 10, 2], [0, 1]),
+    ],
+)
+def test_containment_preserves_coverage_and_packed_order(addrs, sizes, retained):
+    original = copy.deepcopy((addrs, sizes))
+    actual = _compact_transfer_args(["any-model@any-group"], [addrs], [sizes])
+    assert actual == ([[addrs[i] for i in retained]], [[sizes[i] for i in retained]])
+    assert coverage(*original) == coverage(actual[0][0], actual[1][0])
+    assert (addrs, sizes) == original
+    assert _compact_transfer_args(["any-model@any-group"], *actual) == actual
 
-    def test_other_model_group_role_family_unchanged(self):
-        addr, size = _layer(32, 0)
-        for key in (
-            _KEY.replace("DeepSeek-V4-Pro-0813", "another-model"),
-            _KEY.replace("group:0", "group:1"),
-            _KEY.replace("cache_role:kv", "cache_role:state"),
-            _KEY.replace("cache_family:default", "cache_family:c4"),
-            _KEY.replace("DeepSeek-V4-Pro-0813@", "DeepSeek-V4-Pro-0813-other@"),
-        ):
-            with self.subTest(key=key):
-                actual = _compact_group0_transfer_args([key], [addr], [size])
-                self.assertEqual(actual, ([addr], [size]))
-                self.assertIs(actual[0][0], addr)
 
-    def test_unknown_or_partial_layout_unchanged(self):
-        addr, size = _layer(32, 0)
-        wrong_size = size.copy()
-        wrong_size[-1] -= 1
-        separate_buffer = addr.copy()
-        separate_buffer[-1] += 1
-        scale_gap = addr.copy()
-        scale_gap[2] += 1
-        for row, counts in (
-            ([], []),
-            (addr[:3], size[:3]),
-            (addr[:3], size),
-            (addr, wrong_size),
-            (separate_buffer, size),
-            (scale_gap, size),
-            (addr + separate_buffer, size + size),
-            (addr + addr[:2], size + size[:2]),
-        ):
-            with self.subTest(row=row, sizes=counts):
-                original = copy.deepcopy(([row], [counts]))
-                self.assertEqual(_compact_group0_transfer_args([_KEY], [row], [counts]), original)
+@pytest.mark.parametrize("block_size", [32, 128, 256])
+@pytest.mark.parametrize("layers", [1, 29, 32, 61])
+def test_indexer_alias_regression(block_size, layers):
+    # Indexer data and scale also appear as one enclosing view. Sizes are
+    # fixtures for the reported regression, not conditions in the backend.
+    sizes = [size * block_size // 32 for size in (19456, 4096, 128, 4224)]
+    addrs = [
+        value
+        for base in range(0, layers * 400000, 400000)
+        for value in (base, base + 200000, base + 200000 + sizes[1], base + 200000)
+    ]
+    result = _compact_transfer_args(["opaque-key"], [addrs], [sizes * layers])
+    assert result == (
+        [[addr for i, addr in enumerate(addrs) if i % 4 in (0, 3)]],
+        [[size for i, size in enumerate(sizes * layers) if i % 4 in (0, 3)]],
+    )
+    assert coverage(addrs, sizes * layers) == coverage(result[0][0], result[1][0])
 
-    def test_mixed_batch_compacts_only_verified_object(self):
-        addr, size = _layer(128, 0)
-        addresses, sizes = [addr, [10], addr], [size, [7], size]
-        original = copy.deepcopy((addresses, sizes))
-        actual = _compact_group0_transfer_args([_KEY, _KEY, "other"], addresses, sizes)
-        self.assertEqual(actual, ([[addr[0], addr[3]], [10], addr], [[size[0], size[3]], [7], size]))
-        self.assertEqual((addresses, sizes), original)
 
-    def test_empty_batch(self):
-        self.assertEqual(_compact_group0_transfer_args([], [], []), ([], []))
+def test_batches_do_not_compare_addresses_between_keys():
+    addrs, sizes = [[100, 100], [100], []], [[4, 8], [4], []]
+    original = copy.deepcopy((addrs, sizes))
+    assert _compact_transfer_args(["a", "b", "c"], addrs, sizes) == ([[100], [100], []], [[8], [4], []])
+    assert (addrs, sizes) == original
+    assert _compact_transfer_args([], [], []) == ([], [])
 
-    def test_mismatched_batch_lengths_rejected(self):
-        for args in (([_KEY], [], []), ([], [[0]], []), ([_KEY], [[0]], [])):
-            with self.subTest(args=args), self.assertRaisesRegex(ValueError, "batch lengths"):
-                _compact_group0_transfer_args(*args)
 
-    def test_repeated_compaction_is_idempotent(self):
-        addr, size = _layer(128, 0)
-        actual = _compact_group0_transfer_args([_KEY], [addr], [size])
-        self.assertEqual(_compact_group0_transfer_args([_KEY], *actual), actual)
+@pytest.mark.parametrize(
+    "keys,addrs,sizes",
+    [
+        (["a"], [], []),
+        ([], [[0]], []),
+        (["a"], [[0]], []),
+        (["a"], [[0]], [[1, 2]]),
+        (["a"], [[0]], [[0]]),
+        (["a"], [[0]], [[-1]]),
+        (["a"], [[-1]], [[1]]),
+    ],
+)
+def test_invalid_arguments_are_rejected(keys, addrs, sizes):
+    with pytest.raises(ValueError):
+        _compact_transfer_args(keys, addrs, sizes)
 
-    def test_backend_put_get_round_trip(self):
-        # Exercise the real GET/PUT integration with a packed byte store.
-        # Different source/destination pointers ensure no address is serialized.
-        for block_size in (32, 128):
-            with self.subTest(block_size=block_size):
-                self._check_round_trip(block_size)
 
-    def _check_round_trip(self, block_size):
-        source = bytearray((index * 17 + 13) % 256 for index in range(400000))
-        destination = bytearray([255]) * 400000
-        rows = [_layer(block_size, base) for base in (0, 200000)]
-        addr = [value for row, _ in rows for value in row]
-        sizes = [value for _, row in rows for value in row]
-        objects = {}
+def test_randomized_ranges_preserve_coverage():
+    rng = random.Random(20261022)
+    for _ in range(1000):
+        addrs = [rng.randrange(100) for _ in range(rng.randrange(30))]
+        sizes = [rng.randrange(1, 40) for _ in addrs]
+        original = copy.deepcopy((addrs, sizes))
+        compact_addrs, compact_sizes = _compact_transfer_args(["key"], [addrs], [sizes])
+        assert coverage(addrs, sizes) == coverage(compact_addrs[0], compact_sizes[0])
+        assert (addrs, sizes) == original
+        assert _compact_transfer_args(["key"], compact_addrs, compact_sizes) == (compact_addrs, compact_sizes)
 
-        def put(keys, addresses, counts, direction):
-            self.assertEqual(direction, MmcDirect.COPY_L2G.value)
-            for key, pointers, lengths in zip(keys, addresses, counts, strict=True):
-                objects[key] = b"".join(
-                    source[pointer : pointer + length] for pointer, length in zip(pointers, lengths, strict=True)
-                )
-            return [0] * len(keys)
 
-        def get(keys, addresses, counts, direction):
-            self.assertEqual(direction, MmcDirect.COPY_G2L.value)
-            for key, pointers, lengths in zip(keys, addresses, counts, strict=True):
-                offset = 0
-                for pointer, length in zip(pointers, lengths, strict=True):
-                    target = pointer - len(source)
-                    destination[target : target + length] = objects[key][offset : offset + length]
-                    offset += length
-                self.assertEqual(offset, len(objects[key]))
-            return [0] * len(keys)
+def make_backend():
+    backend = MemcacheBackend.__new__(MemcacheBackend)
+    backend._lazy_init = False
+    backend._store_initialized = True
+    backend.store = MagicMock()
+    return backend
 
-        backend = MemcacheBackend.__new__(MemcacheBackend)
-        backend._lazy_init = False
-        backend._store_initialized = True
-        backend.store = MagicMock()
-        backend.store.batch_put_from_layers.side_effect = put
-        backend.store.batch_get_into_layers.side_effect = get
-        self.assertTrue(backend.put([_KEY], [addr], [sizes]))
-        target_addr = [pointer + len(source) for pointer in addr]
-        self.assertEqual(backend.get([_KEY], [target_addr], [sizes]), [0])
-        self.assertEqual(len(backend.store.batch_put_from_layers.call_args.args[1][0]), 4)
-        self.assertEqual(len(backend.store.batch_get_into_layers.call_args.args[1][0]), 4)
-        for start, end in _coverage(addr, sizes):
-            self.assertEqual(destination[start:end], source[start:end])
-        self.assertEqual(destination[90000:100000], bytearray([255]) * 10000)
+
+def test_backend_put_get_roundtrip_with_reversed_allocations():
+    source = bytearray((index * 17 + 13) % 256 for index in range(2000))
+    destination = bytearray([255]) * len(source)
+    # Destination allocations have the opposite address order. Packed order
+    # must follow descriptors, not the addresses used to find containment.
+    source_addrs = [100, 500, 508, 500, 1000, 1500, 1508, 1500]
+    target_addrs = [1000, 1500, 1508, 1500, 100, 500, 508, 500]
+    sizes = [13, 8, 3, 11] * 2
+    objects = {}
+
+    def put(keys, addresses, counts, direction):
+        assert direction == MmcDirect.COPY_L2G.value
+        for key, pointers, lengths in zip(keys, addresses, counts, strict=True):
+            objects[key] = b"".join(
+                source[pointer : pointer + length] for pointer, length in zip(pointers, lengths, strict=True)
+            )
+        return [0] * len(keys)
+
+    def get(keys, addresses, counts, direction):
+        assert direction == MmcDirect.COPY_G2L.value
+        for key, pointers, lengths in zip(keys, addresses, counts, strict=True):
+            offset = 0
+            for pointer, length in zip(pointers, lengths, strict=True):
+                destination[pointer : pointer + length] = objects[key][offset : offset + length]
+                offset += length
+            assert offset == len(objects[key])
+        return [0] * len(keys)
+
+    backend = make_backend()
+    backend.store.batch_put_from_layers.side_effect = put
+    backend.store.batch_get_into_layers.side_effect = get
+    assert backend.put(["opaque-key"], [source_addrs], [sizes])
+    assert backend.get(["opaque-key"], [target_addrs], [sizes]) == [0]
+    assert len(objects["opaque-key"]) == 48
+    expected = bytearray([255]) * len(source)
+    for source_addr, target_addr, size in zip(source_addrs, target_addrs, sizes, strict=True):
+        expected[target_addr : target_addr + size] = source[source_addr : source_addr + size]
+    assert destination == expected, "lost data or copied padding/unrelated bytes"
+
+
+def test_invalid_arguments_do_not_reach_store():
+    backend = make_backend()
+    assert backend.get(["key"], [[100]], [[0]]) is None
+    assert backend.put(["key"], [[100]], [[0]]) is False
+    backend.store.batch_get_into_layers.assert_not_called()
+    backend.store.batch_put_from_layers.assert_not_called()

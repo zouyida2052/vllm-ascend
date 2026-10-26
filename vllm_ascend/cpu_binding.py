@@ -62,12 +62,21 @@ def prepare_cpu_binding(vllm_config: VllmConfig) -> None:
     allowed_cpus: tuple[int, ...] = ()
     if reason is None:
         try:
-            # Use the same framework mapping as NPUWorker, preserving visibility order.
-            # Only the participating local slots are included, not every visible device.
-            devices = tuple(
-                current_platform.device_id_to_physical_device_id(index)
-                for index in range(sizes[0] * sizes[1] * sizes[2])
-            )
+            worker_count = sizes[0] * sizes[1] * sizes[2]
+            assigned_devices = getattr(parallel, "assigned_physical_gpu_ids", None)
+            if assigned_devices is not None:
+                # These IDs are already physical. Capture their order before DP
+                # sharding; the platform's global mapping is only set in workers.
+                devices = tuple(assigned_devices[:worker_count])
+            else:
+                # Include participating slots only, preserving visibility order.
+                devices = tuple(
+                    current_platform.device_id_to_physical_device_id(index) for index in range(worker_count)
+                )
+            if len(devices) != worker_count:
+                raise ValueError(f"expected {worker_count} assigned devices, got {len(devices)}")
+            if len(set(devices)) != worker_count or any(device < 0 for device in devices):
+                raise ValueError("participating physical device IDs must be unique and non-negative")
             allowed_cpus = tuple(sorted(os.sched_getaffinity(0)))
         except (ValueError, IndexError, OSError) as exc:
             reason = f"cannot capture shared CPU/device layout: {exc}"
